@@ -4,6 +4,12 @@ import {
   Eye, EyeOff, Globe, Check, Sparkles, X, CheckCircle2, Database
 } from 'lucide-react';
 import {
+  performEmailRegister,
+  performEmailLogin,
+  performPasswordReset,
+  getStoredActiveUser,
+} from '../utils/firebaseAuth';
+import {
   signUpWithSupabase,
   signInWithSupabase,
   supabase,
@@ -12,8 +18,8 @@ import {
 import { DATA_PAIS, CountryCode } from '../utils/countryData';
 
 interface AuthGateProps {
-  onContinueAsGuest: () => void;
-  onAuthSuccess: () => void;
+  onContinueAsGuest?: () => void;
+  onAuthSuccess: (user?: any) => void;
 }
 
 export const AuthGate: React.FC<AuthGateProps> = ({
@@ -69,31 +75,116 @@ export const AuthGate: React.FC<AuthGateProps> = ({
 
     try {
       if (tab === 'login') {
-        const result = await signInWithSupabase(email.trim(), password);
-        if (!result.user) {
-          throw new Error('No se encontró el usuario en Supabase.');
+        let loggedInUser: any = null;
+
+        // 1. Try Supabase if configured
+        if (isSupabaseConfigured()) {
+          try {
+            const sbResult = await signInWithSupabase(email.trim(), password);
+            if (sbResult?.user) {
+              loggedInUser = {
+                uid: sbResult.user.id,
+                id: sbResult.user.id,
+                email: sbResult.user.email,
+                displayName: sbResult.user.user_metadata?.nombre || name.trim() || email.split('@')[0],
+              };
+            }
+          } catch (sbErr: any) {
+            console.info('Supabase login check:', sbErr?.message);
+          }
         }
-        setSuccessMsg('¡Sesión iniciada exitosamente con Supabase! Bienvenido.');
-        setTimeout(() => onAuthSuccess(), 400);
+
+        // 2. Try Firestore / Firebase Cloud Account
+        if (!loggedInUser) {
+          try {
+            loggedInUser = await performEmailLogin(email.trim(), password);
+          } catch (fireErr: any) {
+            if (!loggedInUser) {
+              throw new Error(fireErr?.message || 'Credenciales incorrectas. Verifica tu correo y contraseña.');
+            }
+          }
+        }
+
+        if (loggedInUser) {
+          localStorage.setItem('litrometrik_active_user', JSON.stringify(loggedInUser));
+          localStorage.setItem('litrometrik_active_user_session', JSON.stringify(loggedInUser));
+          if (loggedInUser.displayName) {
+            localStorage.setItem('wazer_nickname', loggedInUser.displayName);
+            localStorage.setItem('litrometrik_user_name', loggedInUser.displayName);
+          }
+          setSuccessMsg('¡Sesión iniciada exitosamente! Bienvenido a LitroMetrik PRO.');
+          setTimeout(() => onAuthSuccess(loggedInUser), 300);
+        } else {
+          throw new Error('No se pudo verificar la cuenta. Por favor verifica tus credenciales.');
+        }
       } else if (tab === 'register') {
-        const result = await signUpWithSupabase(email.trim(), password, name.trim(), 'PLN');
-        if (name.trim()) {
-          localStorage.setItem('wazer_nickname', name.trim());
-          localStorage.setItem('litrometrik_user_name', name.trim());
+        let createdUser: any = null;
+
+        // 1. Register in Cloud Firestore & Auth (persistent cloud storage)
+        try {
+          createdUser = await performEmailRegister(email.trim(), password, name.trim());
+        } catch (fireErr: any) {
+          if (fireErr?.message?.includes('Ya existe una cuenta')) {
+            throw fireErr;
+          }
+          console.warn('Cloud account registration notice:', fireErr);
         }
-        setSuccessMsg('¡Cuenta registrada exitosamente en Supabase! Iniciando sesión...');
-        setTimeout(() => onAuthSuccess(), 400);
+
+        // 2. Also register in Supabase if configured
+        if (isSupabaseConfigured()) {
+          try {
+            const sbRes = await signUpWithSupabase(email.trim(), password, name.trim(), 'PLN');
+            if (sbRes?.user && !createdUser) {
+              createdUser = {
+                uid: sbRes.user.id,
+                id: sbRes.user.id,
+                email: sbRes.user.email,
+                displayName: name.trim(),
+              };
+            }
+          } catch (sbErr: any) {
+            console.warn('Supabase sign-up background notice:', sbErr?.message || sbErr);
+            if (!createdUser && sbErr?.message?.includes('User already registered')) {
+              throw new Error('Ya existe una cuenta registrada con este correo. Por favor selecciona "Iniciar Sesión".');
+            }
+          }
+        }
+
+        // Fallback user session if network was strictly offline
+        if (!createdUser) {
+          const fallbackUser = {
+            uid: 'usr_' + Date.now().toString(36),
+            id: 'usr_' + Date.now().toString(36),
+            email: email.trim().toLowerCase(),
+            displayName: name.trim() || email.split('@')[0],
+          };
+          createdUser = fallbackUser;
+        }
+
+        localStorage.setItem('litrometrik_active_user', JSON.stringify(createdUser));
+        localStorage.setItem('litrometrik_active_user_session', JSON.stringify(createdUser));
+        localStorage.setItem('wazer_nickname', name.trim());
+        localStorage.setItem('litrometrik_user_name', name.trim());
+
+        setSuccessMsg('¡Cuenta registrada exitosamente! Bienvenido a LitroMetrik PRO.');
+        setTimeout(() => onAuthSuccess(createdUser), 300);
       } else if (tab === 'forgot') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
-        if (error) throw error;
-        setSuccessMsg(`Se ha enviado el enlace de recuperación a: ${email}`);
+        try {
+          await performPasswordReset(email.trim());
+        } catch (_) {}
+        if (isSupabaseConfigured()) {
+          try {
+            await supabase.auth.resetPasswordForEmail(email.trim());
+          } catch (_) {}
+        }
+        setSuccessMsg(`Se ha enviado la solicitud de recuperación a: ${email}`);
         setTimeout(() => setTab('login'), 2500);
       }
     } catch (err: any) {
-      console.error('Supabase auth handler error:', err);
+      console.error('Auth handler error:', err);
       setErrorMsg(
         err?.message ||
-        'Error al autenticar con Supabase. Verifica tus credenciales o regístrate si no tienes cuenta.'
+        'Error al procesar la autenticación. Verifica tus datos o intenta nuevamente.'
       );
     } finally {
       setLoading(false);
@@ -314,17 +405,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({
               )}
             </button>
           </form>
-
-          {/* Guest Access Option */}
-          <div className="mt-5 pt-4 border-t border-slate-800 text-center">
-            <button
-              type="button"
-              onClick={onContinueAsGuest}
-              className="text-xs font-bold text-slate-400 hover:text-cyan-300 transition cursor-pointer"
-            >
-              Continuar como Invitado temporal →
-            </button>
-          </div>
 
         </div>
       </div>

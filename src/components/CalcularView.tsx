@@ -702,15 +702,15 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                   : 'border-slate-800 bg-[#080B11] text-slate-400 hover:text-white'
               }`}
             >
-              <div>
-                <div className="text-xs font-black text-white flex items-center space-x-1">
-                  <span>Aire A/C</span>
-                  <Wind className="w-3.5 h-3.5 text-cyan-400" />
+              <div className="min-w-0 pr-1.5">
+                <div className="text-xs font-black text-white flex items-center space-x-1.5">
+                  <span className="truncate">Aire A/C</span>
+                  <Wind className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">+0.6 L/100km directo</div>
+                <div className="text-[10px] text-slate-400 mt-0.5 truncate">+0.6 L/100km directo</div>
               </div>
               <div
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors ${
+                className={`w-9 h-5 rounded-full p-0.5 transition-colors shrink-0 ${
                   inputs.isACActive ? 'bg-cyan-400' : 'bg-slate-800'
                 }`}
               >

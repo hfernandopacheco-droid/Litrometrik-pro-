@@ -10,6 +10,7 @@ import {
   getSupabaseConfig,
   updateSupabaseCredentials,
 } from '../utils/supabaseClient';
+import { performSignOut } from '../utils/firebaseAuth';
 
 interface UserAccountModalProps {
   isOpen: boolean;
@@ -54,7 +55,12 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
       setConfirmSignOut(true);
       return;
     }
-    await signOutSupabase();
+    try {
+      await signOutSupabase();
+    } catch (_) {}
+    try {
+      await performSignOut();
+    } catch (_) {}
     onLogout();
     onClose();
   };

@@ -108,7 +108,7 @@ export async function hashPassword(password: string): Promise<string> {
 
 export function getStoredActiveUser(): SimpleAuthUser | null {
   try {
-    const raw = localStorage.getItem(LOCAL_USER_SESSION_KEY);
+    const raw = localStorage.getItem(LOCAL_USER_SESSION_KEY) || localStorage.getItem('litrometrik_active_user');
     if (raw) return JSON.parse(raw);
   } catch (e) {
     console.error('Error reading stored user session', e);
@@ -119,8 +119,10 @@ export function getStoredActiveUser(): SimpleAuthUser | null {
 function setActiveUser(user: SimpleAuthUser | null) {
   if (user) {
     localStorage.setItem(LOCAL_USER_SESSION_KEY, JSON.stringify(user));
+    localStorage.setItem('litrometrik_active_user', JSON.stringify(user));
   } else {
     localStorage.removeItem(LOCAL_USER_SESSION_KEY);
+    localStorage.removeItem('litrometrik_active_user');
   }
   authListeners.forEach((fn) => {
     try {

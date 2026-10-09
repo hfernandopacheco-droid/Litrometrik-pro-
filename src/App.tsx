@@ -53,7 +53,20 @@ export default function App() {
   const [isDesktopFrame, setIsDesktopFrame] = useState(false);
 
   useEffect(() => {
-    // 1. Supabase Auth Listener (Primary Backend)
+    // 0. Initial check from stored session
+    const stored = getStoredActiveUser();
+    if (stored) {
+      setCurrentUser(stored);
+    }
+
+    // 1. Cloud Firestore / Firebase Auth listener
+    const unsubFirebase = subscribeToAuth((fbUser) => {
+      if (fbUser) {
+        setCurrentUser(fbUser);
+      }
+    });
+
+    // 2. Supabase Auth Listener (if configured)
     const unsubSupabase = subscribeToSupabaseAuth(async (sbUser) => {
       if (sbUser) {
         const appUser = {
@@ -64,6 +77,7 @@ export default function App() {
         };
         setCurrentUser(appUser);
         localStorage.setItem('litrometrik_active_user', JSON.stringify(appUser));
+        localStorage.setItem('litrometrik_active_user_session', JSON.stringify(appUser));
 
         // Load profile from Supabase
         try {
@@ -109,16 +123,16 @@ export default function App() {
             }));
             setSavedTrips(mapped);
           } else {
-            // Fresh account starts totally clean in 0!
+            // Fresh account starts clean
             setSavedTrips([]);
           }
         } catch (_) {
           setSavedTrips([]);
         }
       } else {
-        // Fallback to local user if guest
+        // Fallback to local stored user
         const localUser = getStoredActiveUser();
-        if (localUser && (localUser.uid === 'guest' || localUser.uid === 'guest_user')) {
+        if (localUser) {
           setCurrentUser(localUser);
         } else {
           setCurrentUser(null);
@@ -130,6 +144,7 @@ export default function App() {
 
     return () => {
       unsubSupabase();
+      unsubFirebase();
     };
   }, []);
 
@@ -361,16 +376,11 @@ export default function App() {
   if (!currentUser) {
     return (
       <AuthGate
-        onAuthSuccess={() => {
-          const u = getStoredActiveUser();
+        onAuthSuccess={(authUser) => {
+          const u = authUser || getStoredActiveUser();
           if (u) {
             setCurrentUser(u);
           }
-        }}
-        onContinueAsGuest={() => {
-          const guestUser = { uid: 'guest_user', email: 'invitado@litrometrik.pro', displayName: 'Conductor Invitado' };
-          localStorage.setItem('litrometrik_active_user', JSON.stringify(guestUser));
-          setCurrentUser(guestUser);
         }}
       />
     );

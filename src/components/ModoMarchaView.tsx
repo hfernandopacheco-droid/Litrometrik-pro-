@@ -1612,17 +1612,23 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 <span className="text-base">{activeVehiclePreset.icon}</span>
               </div>
               <div className="min-w-0">
-                <div className="flex items-center space-x-1.5 leading-tight">
+                <div className="flex items-center space-x-1.5 leading-tight flex-wrap gap-y-1">
                   <span className="text-xs font-black text-white truncate">
                     {activeVehiclePreset.label}
                   </span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-400 font-bold border border-sky-500/30 shrink-0">
                     {engineName}
                   </span>
+                  {isACActive && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-cyan-500/25 text-cyan-300 font-black border border-cyan-400/50 shrink-0 flex items-center space-x-1">
+                      <Snowflake className="w-2.5 h-2.5 text-cyan-300 animate-spin" />
+                      <span>A/C (+0.6)</span>
+                    </span>
+                  )}
                 </div>
                 <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
                   {baseConsumptionL100.toFixed(1)} L/100km base • {transmission === 'automatic' ? 'Automático' : 'Manual'}
-                  {isACActive ? ' • A/C (+0.6)' : ''}
+                  {isACActive ? ' • A/C Encendido' : ' • Modo Eco'}
                 </p>
               </div>
             </div>
@@ -1705,33 +1711,44 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* Campo 4: SWIFT DE AIRE ACONDICIONADO A/C (Bottom-Right) - Reemplaza al cronómetro según Imagen 1 & 2 */}
+            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) - Letras perfectamente cuadradas y visibles */}
             <div
               onClick={toggleAC}
-              className={`relative min-h-[126px] sm:min-h-[136px] p-4 sm:p-5 rounded-br-[34px] rounded-bl-2xl rounded-tr-2xl rounded-tl-[52px] border transition-all duration-300 flex flex-col justify-between cursor-pointer select-none overflow-hidden ${
+              className={`relative min-h-[126px] sm:min-h-[136px] p-4 sm:p-5 rounded-br-[34px] rounded-bl-2xl rounded-tr-2xl rounded-tl-[52px] border transition-all duration-300 flex flex-col justify-between text-right cursor-pointer select-none overflow-hidden ${
                 isACActive
                   ? 'bg-gradient-to-br from-[#0B2138] via-[#0A1A2C] to-[#121620] border-cyan-400/80 shadow-[0_0_30px_rgba(0,212,255,0.25)] ring-1 ring-cyan-400/30'
                   : 'bg-[#121620]/95 border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-300 uppercase flex items-center space-x-1.5">
-                  <Snowflake className={`w-3.5 h-3.5 ${isACActive ? 'text-cyan-400 animate-spin' : 'text-slate-400'}`} />
-                  <span>Aire A/C 💨</span>
+              {/* Header alineado a la derecha para no quedar cubierto por el velocímetro */}
+              <div className="flex items-center justify-end space-x-2 pl-4">
+                <span
+                  className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-black tracking-wider uppercase transition-all shadow-sm ${
+                    isACActive
+                      ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-cyan-500/20'
+                      : 'bg-slate-800/90 border-slate-700/80 text-slate-300'
+                  }`}
+                >
+                  <Snowflake
+                    className={`w-3.5 h-3.5 shrink-0 ${
+                      isACActive ? 'text-cyan-300 animate-spin' : 'text-slate-400'
+                    }`}
+                  />
+                  <span className="font-black whitespace-nowrap">A/C CLIMA</span>
                 </span>
 
-                {/* Tactile Switch Toggle (Imagen 2) */}
+                {/* Tactile Switch Toggle */}
                 <div
-                  className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 shadow-inner ${
+                  className={`w-10 h-5.5 rounded-full transition-colors flex items-center px-0.5 shadow-inner shrink-0 ${
                     isACActive ? 'bg-[#00D4FF] justify-end' : 'bg-slate-700 justify-start'
                   }`}
                 >
-                  <div className="w-5 h-5 rounded-full bg-white shadow-md transform transition-transform" />
+                  <div className="w-4.5 h-4.5 rounded-full bg-white shadow-md transform transition-transform" />
                 </div>
               </div>
 
               <div>
-                <div className="flex items-baseline space-x-1">
+                <div className="flex items-baseline justify-end space-x-1">
                   <span
                     className={`text-2xl sm:text-3xl font-black font-sans tracking-tight transition-colors ${
                       isACActive
@@ -1744,11 +1761,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   <span className="text-xs font-bold text-slate-400">L/100km</span>
                 </div>
                 <p
-                  className={`text-[10px] sm:text-[11px] font-bold mt-0.5 ${
+                  className={`text-[10px] sm:text-[11px] font-bold mt-0.5 truncate ${
                     isACActive ? 'text-cyan-300' : 'text-slate-500'
                   }`}
                 >
-                  {isACActive ? 'Carga A/C activa • Descontando' : 'A/C apagado (Modo Eco)'}
+                  {isACActive ? 'A/C Encendido (+0.6)' : 'A/C Apagado (Modo Eco)'}
                 </p>
               </div>
             </div>
