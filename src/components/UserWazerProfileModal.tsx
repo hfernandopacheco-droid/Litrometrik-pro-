@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { DATA_PAIS, CountryCode, CarModelSpec } from '../utils/countryData';
 import { getStoredActiveUser, updateActiveUserProfile } from '../utils/firebaseAuth';
+import { saveActiveVehicleState } from '../utils/vehicleCatalog';
 
 interface UserWazerProfileModalProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const currentCountryInfo = DATA_PAIS[country] || DATA_PAIS.PL;
   const availableCars = currentCountryInfo.cars || [];
@@ -119,6 +121,13 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
     localStorage.setItem('litrometrik_user_vehicle', vehicleType);
     localStorage.setItem('litrometrik_user_engine', engineSize);
     localStorage.setItem('litrometrik_user_fuel', fuelType);
+
+    saveActiveVehicleState({
+      vehicleModelName: carModelName,
+      vehicleType: vehicleType as any,
+      displacement: `${engineSize}L`,
+      fuelType: fuelType,
+    });
 
     updateActiveUserProfile({
       displayName: nickname,
@@ -224,17 +233,27 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
               <div className="flex items-center space-x-2 mt-2">
                 <button
                   type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="px-2.5 py-1 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 border border-sky-500/40 text-sky-300 text-[11px] font-bold flex items-center space-x-1.5 transition cursor-pointer"
+                  title="Tomar foto con la cámara"
+                >
+                  <Camera className="w-3 h-3" />
+                  <span>Cámara</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1 rounded-xl bg-violet-600/30 hover:bg-violet-600/50 border border-violet-500/40 text-violet-300 text-[11px] font-bold flex items-center space-x-1.5 transition cursor-pointer"
+                  className="px-2.5 py-1 rounded-xl bg-violet-600/30 hover:bg-violet-600/50 border border-violet-500/40 text-violet-300 text-[11px] font-bold flex items-center space-x-1.5 transition cursor-pointer"
+                  title="Subir foto desde la galería"
                 >
                   <Upload className="w-3 h-3" />
-                  <span>Subir Foto</span>
+                  <span>Galería</span>
                 </button>
                 {photoURL && (
                   <button
                     type="button"
                     onClick={handleRemovePhoto}
-                    className="px-2.5 py-1 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 text-[11px] font-bold flex items-center space-x-1 transition cursor-pointer"
+                    className="px-2 py-1 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 text-[11px] font-bold flex items-center space-x-1 transition cursor-pointer"
                   >
                     <Trash2 className="w-3 h-3" />
                     <span>Quitar</span>
@@ -253,7 +272,15 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png, image/jpeg, image/webp"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoUpload}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
             className="hidden"
             onChange={handlePhotoUpload}
           />

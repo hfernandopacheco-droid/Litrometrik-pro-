@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Wrench,
   Disc,
@@ -20,12 +20,20 @@ import {
   Calendar,
   CalendarDays,
   Bell,
-  Check,
   Trash2,
+  Camera,
+  Upload,
 } from 'lucide-react';
 import { CountryCode, DATA_PAIS } from '../utils/countryData';
 import { fetchCloudRecords } from '../utils/firestoreService';
 import { getSupabaseGarageRecords } from '../utils/supabaseClient';
+import {
+  getActiveVehicleState,
+  saveActiveVehicleState,
+  UNIFIED_VEHICLE_CATALOG,
+  ActiveVehicleState,
+} from '../utils/vehicleCatalog';
+import { Sedan3D, Suv3D, Compacto3D, Pickup3D, Van3D, Custom3D } from './Vehicle3DIcons';
 
 interface GarajeViewProps {
   onSelectCategory: (category: 'mantenimiento' | 'neumaticos' | 'tramites') => void;
@@ -55,6 +63,47 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
   const [showOdoModal, setShowOdoModal] = useState(false);
   const [newOdoInput, setNewOdoInput] = useState('');
   const [showDiagnosisModal, setShowDiagnosisModal] = useState(false);
+
+  // Sincronización del vehículo y motor desde Modo de Marcha y Tablero
+  const [activeVehicle, setActiveVehicle] = useState<ActiveVehicleState>(getActiveVehicleState);
+  const [carPhoto, setCarPhoto] = useState<string | null>(() => activeVehicle.carPhotoUrl);
+  const garageGalleryInputRef = useRef<HTMLInputElement>(null);
+  const garageCameraInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleSyncVehicle = () => {
+      const v = getActiveVehicleState();
+      setActiveVehicle(v);
+      setCarPhoto(v.carPhotoUrl);
+    };
+    window.addEventListener('litrometrik-vehicle-updated', handleSyncVehicle);
+    window.addEventListener('storage', handleSyncVehicle);
+    return () => {
+      window.removeEventListener('litrometrik-vehicle-updated', handleSyncVehicle);
+      window.removeEventListener('storage', handleSyncVehicle);
+    };
+  }, []);
+
+  const handleGaragePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La foto debe ser menor a 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setCarPhoto(base64);
+      saveActiveVehicleState({ carPhotoUrl: base64 });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleGarageRemovePhoto = () => {
+    setCarPhoto(null);
+    saveActiveVehicleState({ carPhotoUrl: null });
+  };
 
   // Calendar reminder modal state
   const [editingCategoryReminder, setEditingCategoryReminder] = useState<'mantenimiento' | 'neumaticos' | 'tramites' | null>(null);
@@ -569,27 +618,129 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
           {/* Subtle top glow line */}
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#FF4F00]/40 to-transparent pointer-events-none" />
 
-          {/* Vehicle Header info (Without the "Editar Km" button as requested) */}
+          {/* Vehicle Header info: Synchronized with Modo de Marcha */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 min-w-0">
               <div className="w-10 h-10 rounded-2xl bg-[#FF4F00]/15 border border-[#FF4F00]/30 flex items-center justify-center text-[#FF4F00] shrink-0">
                 <Car className="w-5 h-5" />
               </div>
-              <div>
-                <h2 className="text-sm font-black text-white flex items-center space-x-1.5">
-                  <span>{activeCar.brand} {activeCar.model}</span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-black text-white truncate flex items-center space-x-1.5">
+                  <span className="truncate">{activeVehicle.vehicleModelName || `${activeCar.brand} ${activeCar.model}`}</span>
                 </h2>
-                <p className="text-[10px] text-slate-400 font-medium">
+                <p className="text-[10px] text-slate-400 font-medium truncate">
                   {selectedCountry === 'CO' ? 'Placa: KLM-428 • Bogotá' : selectedCountry === 'ES' ? 'Matrícula: 4812-LBC • Madrid' : selectedCountry === 'MX' ? 'Placas: 924-ZPX • CDMX' : 'Rejestracja: KR-5821P'}
                 </p>
               </div>
             </div>
 
             {/* Quick sync indicator */}
-            <div className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-slate-300 font-bold">
+            <div className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[10px] text-emerald-400 font-bold shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Sincronizado</span>
+              <span>Sincronizado con Marcha</span>
             </div>
+          </div>
+
+          {/* FOTO DEL CARRO O GRÁFICA 3D PROFESIONAL REAL CON OPCIÓN DE CÁMARA O GALERÍA */}
+          <div className="p-3.5 rounded-2xl bg-[#080B11] border border-slate-800/90 relative overflow-hidden space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  {carPhoto ? 'Foto Real de tu Vehículo' : 'Vehículo Calibrado'}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-300 font-bold">
+                  {activeVehicle.baseL100.toFixed(1)} L/100km
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {activeVehicle.transmission === 'automatic' ? 'Transmisión Automática' : 'Transmisión Manual'}
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              {/* Photo Frame or Professional 3D Vector Icon */}
+              <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#121620] to-[#0D1017] border border-slate-700/80 overflow-hidden shrink-0 flex items-center justify-center relative shadow-inner">
+                {carPhoto ? (
+                  <img
+                    src={carPhoto}
+                    alt="Vehículo"
+                    className="w-full h-full object-cover rounded-2xl hover:scale-105 transition duration-300"
+                  />
+                ) : (
+                  <div className="p-1 flex items-center justify-center">
+                    {activeVehicle.vehicleType === 'sedan' && <Sedan3D size={76} />}
+                    {activeVehicle.vehicleType === 'suv' && <Suv3D size={76} />}
+                    {activeVehicle.vehicleType === 'compact' && <Compacto3D size={76} />}
+                    {activeVehicle.vehicleType === 'pickup' && <Pickup3D size={76} />}
+                    {activeVehicle.vehicleType === 'van' && <Van3D size={76} />}
+                    {activeVehicle.vehicleType === 'custom' && <Custom3D size={76} />}
+                  </div>
+                )}
+              </div>
+
+              {/* Engine Details & Camera / Gallery Buttons */}
+              <div className="flex-1 min-w-0 space-y-2">
+                <div>
+                  <div className="text-xs font-black text-white truncate">
+                    {activeVehicle.engineName}
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                    {activeVehicle.displacement || 'Motor estándar calibrado'}
+                  </div>
+                </div>
+
+                {/* Upload Buttons */}
+                <div className="flex items-center space-x-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => garageCameraInputRef.current?.click()}
+                    className="px-2.5 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 text-[11px] font-bold flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-sm"
+                    title="Tomar foto con la cámara del dispositivo"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Tomar Foto</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => garageGalleryInputRef.current?.click()}
+                    className="px-2.5 py-1.5 rounded-xl bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/40 text-violet-300 text-[11px] font-bold flex items-center space-x-1.5 transition cursor-pointer active:scale-95 shadow-sm"
+                    title="Subir foto desde la galería"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Galería</span>
+                  </button>
+
+                  {carPhoto && (
+                    <button
+                      type="button"
+                      onClick={handleGarageRemovePhoto}
+                      className="p-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 transition cursor-pointer active:scale-95"
+                      title="Eliminar foto personalizada y volver a la gráfica 3D"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Hidden Inputs for Camera and Gallery */}
+            <input
+              ref={garageGalleryInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleGaragePhotoUpload}
+            />
+            <input
+              ref={garageCameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleGaragePhotoUpload}
+            />
           </div>
 
           {/* 2 Interactive Boxes: ODÓMETRO TOTAL & ESTADO CON INFORMACIÓN DE CADUCIDAD */}

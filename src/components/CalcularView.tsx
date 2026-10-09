@@ -42,91 +42,63 @@ interface CalcularViewProps {
   currentUser: any;
 }
 
-interface EngineSpec {
-  key: string;
-  name: string;
-  displacement: string;
-  baseL100: number;
-  description: string;
-}
+import {
+  UNIFIED_VEHICLE_CATALOG,
+  UnifiedEngineSpec,
+  getActiveVehicleState,
+  saveActiveVehicleState,
+} from '../utils/vehicleCatalog';
 
 interface VehicleCatalogItem {
   type: string;
   label: string;
   renderIcon: (className?: string) => React.ReactNode;
   defaultBase: number;
-  engines: EngineSpec[];
+  engines: UnifiedEngineSpec[];
 }
 
 const VEHICLE_CATALOG: Record<string, VehicleCatalogItem> = {
   compact: {
     type: 'compact',
-    label: 'Compacto',
+    label: UNIFIED_VEHICLE_CATALOG.compact.label,
     renderIcon: (cls) => <Compacto3D className={cls} size={46} />,
-    defaultBase: 6.0,
-    engines: [
-      { key: 'eco_10', name: '1.0L Eco TSI', displacement: '999 cc • Urbano', baseL100: 5.2, description: 'Bajo consumo en ciudad y bajas emisiones' },
-      { key: 'urbano_14', name: '1.2L - 1.4L Urbano', displacement: '1.395 cc • Atmosférico/Turbo', baseL100: 6.0, description: 'Estándar equilibrado ciudad y carretera' },
-      { key: 'sport_16', name: '1.5L - 1.6L Sport', displacement: '1.598 cc • 150 CV', baseL100: 6.8, description: 'Respuesta dinámica y agilidad en autopista' },
-      { key: 'custom', name: 'Personalizado', displacement: 'Entrada manual directa', baseL100: 6.0, description: 'Ingresa el consumo real registrado en tu tablero' },
-    ],
+    defaultBase: UNIFIED_VEHICLE_CATALOG.compact.defaultBaseL100,
+    engines: UNIFIED_VEHICLE_CATALOG.compact.engines,
   },
   sedan: {
     type: 'sedan',
-    label: 'Sedán',
+    label: UNIFIED_VEHICLE_CATALOG.sedan.label,
     renderIcon: (cls) => <Sedan3D className={cls} size={46} />,
-    defaultBase: 8.5,
-    engines: [
-      { key: 'sedan_16', name: '1.4L - 1.6L Eficiente', displacement: '1.598 cc • 125 CV', baseL100: 7.2, description: 'Excelente rendimiento en autopista y crucero' },
-      { key: 'sedan_20', name: '1.8L - 2.0L Confort', displacement: '1.984 cc • Estándar', baseL100: 8.5, description: 'Gama media equilibrada con potencia estable' },
-      { key: 'sedan_25', name: '2.5L - 3.0L Premium', displacement: '2.488 cc - 2.995 cc', baseL100: 10.2, description: 'Alta cilindrada y máxima aceleración en ruta' },
-      { key: 'custom', name: 'Personalizado', displacement: 'Entrada manual directa', baseL100: 8.5, description: 'Ingresa el consumo real registrado en tu tablero' },
-    ],
+    defaultBase: UNIFIED_VEHICLE_CATALOG.sedan.defaultBaseL100,
+    engines: UNIFIED_VEHICLE_CATALOG.sedan.engines,
   },
   suv: {
     type: 'suv',
-    label: 'SUV',
+    label: UNIFIED_VEHICLE_CATALOG.suv.label,
     renderIcon: (cls) => <Suv3D className={cls} size={46} />,
-    defaultBase: 10.5,
-    engines: [
-      { key: 'suv_fwd', name: '1.5L - 2.0L Crossover FWD', displacement: '1.498 cc • Tracción 4x2', baseL100: 9.2, description: 'Uso familiar y trayectos interurbanos' },
-      { key: 'suv_awd', name: '2.0L - 2.5L AWD Tracción Total', displacement: '1.984 cc - 2.488 cc 4x4', baseL100: 10.5, description: 'Tracción integral en lluvia, nieve y pendientes' },
-      { key: 'suv_v6', name: '3.0L V6 / Gran SUV 7P', displacement: '2.995 cc • Gran chasis', baseL100: 12.4, description: 'Gran porte, remolque y carga completa' },
-      { key: 'custom', name: 'Personalizado', displacement: 'Entrada manual directa', baseL100: 10.5, description: 'Ingresa el consumo real registrado en tu tablero' },
-    ],
-  },
-  van: {
-    type: 'van',
-    label: 'Furgón',
-    renderIcon: (cls) => <Van3D className={cls} size={46} />,
-    defaultBase: 9.8,
-    engines: [
-      { key: 'van_light', name: '2.0L TDI / Diésel Ligero', displacement: '1.968 cc • 110 CV', baseL100: 8.5, description: 'Reparto y logística de paquetería urbana' },
-      { key: 'van_mid', name: '2.3L Utilitario Medio', displacement: '2.287 cc • 140 CV', baseL100: 9.8, description: 'Carga estándar y traslados interurbanos' },
-      { key: 'van_heavy', name: '3.0L Diésel Carga Pesada', displacement: '2.998 cc • Chasis cabina', baseL100: 11.8, description: 'Capacidad máxima de carga y arrastre' },
-      { key: 'custom', name: 'Personalizado', displacement: 'Entrada manual directa', baseL100: 9.8, description: 'Ingresa el consumo real registrado en tu tablero' },
-    ],
+    defaultBase: UNIFIED_VEHICLE_CATALOG.suv.defaultBaseL100,
+    engines: UNIFIED_VEHICLE_CATALOG.suv.engines,
   },
   pickup: {
     type: 'pickup',
-    label: 'Pickup',
+    label: UNIFIED_VEHICLE_CATALOG.pickup.label,
     renderIcon: (cls) => <Pickup3D className={cls} size={46} />,
-    defaultBase: 10.5,
-    engines: [
-      { key: 'pick_4x2', name: '2.0L - 2.4L Diésel 4x2', displacement: '2.393 cc • Trabajo diario', baseL100: 8.8, description: 'Uso comercial mixto y trabajo utilitario' },
-      { key: 'pick_4x4', name: '2.8L - 3.2L Turbodiésel 4x4', displacement: '2.755 cc • 204 CV', baseL100: 10.8, description: 'Trabajo duro, arrastre pesado y barro' },
-      { key: 'pick_v8', name: '5.0L - 5.7L V8 Gasolina', displacement: '5.654 cc • Gran potencia', baseL100: 14.2, description: 'Gran cilindrada americana y carga pesada' },
-      { key: 'custom', name: 'Personalizado', displacement: 'Entrada manual directa', baseL100: 10.5, description: 'Ingresa el consumo real registrado en tu tablero' },
-    ],
+    defaultBase: UNIFIED_VEHICLE_CATALOG.pickup.defaultBaseL100,
+    engines: UNIFIED_VEHICLE_CATALOG.pickup.engines,
+  },
+  van: {
+    type: 'van',
+    label: UNIFIED_VEHICLE_CATALOG.van.label,
+    renderIcon: (cls) => <Van3D className={cls} size={46} />,
+    defaultBase: UNIFIED_VEHICLE_CATALOG.van.defaultBaseL100,
+    engines: UNIFIED_VEHICLE_CATALOG.van.engines,
   },
   custom: {
     type: 'custom',
-    label: 'Personalizado',
+    label: UNIFIED_VEHICLE_CATALOG.custom.label,
     renderIcon: (cls) => <Custom3D className={cls} size={46} />,
-    defaultBase: 8.0,
-    engines: [
-      { key: 'custom', name: 'Personalizado Directo', displacement: 'Entrada manual de tablero', baseL100: 8.0, description: 'Ingresa el consumo exacto que marca tu odómetro' },
-    ],
+    defaultBase: UNIFIED_VEHICLE_CATALOG.custom.defaultBaseL100,
+    engines: UNIFIED_VEHICLE_CATALOG.custom.engines,
   },
 };
 
@@ -225,19 +197,32 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
   };
 
   // Handler: Select Specific Engine under modal vehicle
-  const handleSelectEngine = (engine: EngineSpec) => {
+  const handleSelectEngine = (engine: UnifiedEngineSpec) => {
     setSelectedEngineKey(engine.key);
 
     if (modalVehicleKey !== activeVehicleKey) {
       onChange({ vehicleType: modalVehicleKey as any });
     }
 
-    if (engine.key === 'custom') {
+    if (engine.key.includes('custom') || engine.key === 'custom_direct') {
       const parsed = parseFloat(customInputText.replace(',', '.'));
-      onChange({ customBaseConsumption: !isNaN(parsed) && parsed > 0 ? parsed : 8.0 });
+      const finalVal = !isNaN(parsed) && parsed > 0 ? parsed : 8.0;
+      onChange({ customBaseConsumption: finalVal });
+      saveActiveVehicleState({
+        vehicleType: modalVehicleKey as any,
+        engineKey: engine.key,
+        engineName: engine.name,
+        baseL100: finalVal,
+      });
     } else {
       setCustomInputText(engine.baseL100.toString());
       onChange({ customBaseConsumption: engine.baseL100 });
+      saveActiveVehicleState({
+        vehicleType: modalVehicleKey as any,
+        engineKey: engine.key,
+        engineName: engine.name,
+        baseL100: engine.baseL100,
+      });
     }
   };
 

@@ -45,6 +45,21 @@ import { saveCloudRecord, saveCloudVehicleConfig } from '../utils/firestoreServi
 import { clearSupabaseTrips, signOutSupabase } from '../utils/supabaseClient';
 import { UserAccountModal } from './UserAccountModal';
 import { VehicleType, TransmissionType } from '../types';
+import {
+  UNIFIED_VEHICLE_CATALOG,
+  UnifiedEngineSpec,
+  UnifiedVehicleCategory,
+  getActiveVehicleState,
+  saveActiveVehicleState,
+} from '../utils/vehicleCatalog';
+import {
+  Sedan3D,
+  Suv3D,
+  Compacto3D,
+  Pickup3D,
+  Van3D,
+  Custom3D,
+} from './Vehicle3DIcons';
 
 export type TimeFilterPeriod = 'DIA' | 'SEMANA' | 'MES' | 'ANO';
 export type FuelKey = 'Gasolina Pb95' | 'Diésel ON' | 'Gas GLP / LPG';
@@ -74,65 +89,7 @@ export interface ViajeRegistro {
   isACActive?: boolean;
 }
 
-interface VehiclePreset {
-  type: VehicleType;
-  label: string;
-  icon: string;
-  defaultEngine: string;
-  defaultBaseL100: number;
-  engines: { name: string; displacement: string; baseL100: number }[];
-}
-
-const VEHICLE_PRESETS: VehiclePreset[] = [
-  {
-    type: 'compact',
-    label: 'Compacto / Urbano',
-    icon: '🚗',
-    defaultEngine: '1.2L 16V',
-    defaultBaseL100: 6.0,
-    engines: [
-      { name: '1.0L EcoBoost / MPI', displacement: '1.0L', baseL100: 5.4 },
-      { name: '1.2L Estándar 16V', displacement: '1.2L', baseL100: 6.0 },
-      { name: '1.4L Turbo / TSI', displacement: '1.4L', baseL100: 6.8 },
-    ],
-  },
-  {
-    type: 'sedan',
-    label: 'Sedán / Mediano',
-    icon: '🚘',
-    defaultEngine: '1.8L - 2.0L',
-    defaultBaseL100: 8.5,
-    engines: [
-      { name: '1.6L 16V Eficiente', displacement: '1.6L', baseL100: 7.6 },
-      { name: '1.8L / 2.0L Estándar', displacement: '2.0L', baseL100: 8.5 },
-      { name: '2.4L / 2.5L Potente', displacement: '2.5L', baseL100: 9.8 },
-    ],
-  },
-  {
-    type: 'suv',
-    label: 'Grande / SUV / 4x4',
-    icon: '🚙',
-    defaultEngine: '2.0L Turbo',
-    defaultBaseL100: 10.5,
-    engines: [
-      { name: '1.8L - 2.0L Turbo', displacement: '2.0L', baseL100: 9.5 },
-      { name: '2.4L - 2.5L AWD', displacement: '2.5L', baseL100: 10.5 },
-      { name: '3.0L V6 / 4x4', displacement: '3.0L', baseL100: 12.8 },
-    ],
-  },
-  {
-    type: 'custom',
-    label: 'Personalizado',
-    icon: '⚡',
-    defaultEngine: 'Manual tablero',
-    defaultBaseL100: 8.0,
-    engines: [
-      { name: 'Económico (6.5 L/100)', displacement: '1.4L', baseL100: 6.5 },
-      { name: 'Estándar (8.0 L/100)', displacement: '1.8L', baseL100: 8.0 },
-      { name: 'Alto Consumo (11.0 L/100)', displacement: '2.8L', baseL100: 11.0 },
-    ],
-  },
-];
+const VEHICLE_PRESETS: UnifiedVehicleCategory[] = Object.values(UNIFIED_VEHICLE_CATALOG);
 
 export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   selectedCountry,
@@ -196,6 +153,34 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const [modalTempEngineName, setModalTempEngineName] = useState<string>(engineName);
   const [modalTempBaseL100, setModalTempBaseL100] = useState<number>(baseConsumptionL100);
   const [modalTempTransmission, setModalTempTransmission] = useState<TransmissionType>(transmission);
+  const [modalTempVehicleModelName, setModalTempVehicleModelName] = useState<string>(() => {
+    return localStorage.getItem('litrometrik_user_vehicle_model') || '';
+  });
+
+  const renderMarchaVehicle3D = (type: string, size = 36) => {
+    if (type === 'sedan') return <Sedan3D size={size} />;
+    if (type === 'suv') return <Suv3D size={size} />;
+    if (type === 'compact') return <Compacto3D size={size} />;
+    if (type === 'pickup') return <Pickup3D size={size} />;
+    if (type === 'van') return <Van3D size={size} />;
+    return <Custom3D size={size} />;
+  };
+
+  useEffect(() => {
+    const handleVehicleSync = () => {
+      const state = getActiveVehicleState();
+      setVehicleType(state.vehicleType);
+      setEngineName(state.engineName);
+      setBaseConsumptionL100(state.baseL100);
+      setTransmission(state.transmission);
+    };
+    window.addEventListener('litrometrik-vehicle-updated', handleVehicleSync);
+    window.addEventListener('storage', handleVehicleSync);
+    return () => {
+      window.removeEventListener('litrometrik-vehicle-updated', handleVehicleSync);
+      window.removeEventListener('storage', handleVehicleSync);
+    };
+  }, []);
 
   // ---------------- FUNCTIONAL AIRE ACONDICIONADO (A/C) STATE ----------------
   const [isACActive, setIsACActive] = useState<boolean>(() => {
@@ -1159,13 +1144,13 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     setBaseConsumptionL100(modalTempBaseL100);
     setTransmission(modalTempTransmission);
 
-    try {
-      localStorage.setItem('litrometrik_active_vehicle_type', modalTempVehicleType);
-      localStorage.setItem('litrometrik_active_engine_name', modalTempEngineName);
-      localStorage.setItem('litrometrik_active_base_l100', modalTempBaseL100.toString());
-      localStorage.setItem('litrometrik_active_transmission', modalTempTransmission);
-      window.dispatchEvent(new CustomEvent('litrometrik-vehicle-updated'));
-    } catch (_) {}
+    saveActiveVehicleState({
+      vehicleType: modalTempVehicleType as any,
+      engineName: modalTempEngineName,
+      baseL100: modalTempBaseL100,
+      transmission: modalTempTransmission,
+      vehicleModelName: modalTempVehicleModelName || undefined,
+    });
 
     setShowVehicleModal(false);
     setNotification(`🚗 Vehículo calibrado: ${modalTempEngineName} (${modalTempBaseL100} L/100km base)`);
@@ -1415,6 +1400,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
   const currentCountry = countries.find((c) => c.code === selectedCountry) || countries[0];
   const activeVehiclePreset = VEHICLE_PRESETS.find((v) => v.type === vehicleType) || VEHICLE_PRESETS[1];
+  const activeVehicleState = getActiveVehicleState();
 
   return (
     <div className="min-h-screen bg-[#080B11] text-white pb-28 sm:pb-32 select-none font-sans antialiased">
@@ -1608,13 +1594,21 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             className="flex-1 flex items-center justify-between p-1 rounded-xl hover:bg-white/5 transition active:scale-[0.99] cursor-pointer text-left group"
           >
             <div className="flex items-center space-x-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500/20 via-blue-600/30 to-indigo-600/20 border border-sky-500/40 flex items-center justify-center shrink-0 shadow-sm">
-                <span className="text-base">{activeVehiclePreset.icon}</span>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#121620] to-[#0D1017] border border-slate-700/80 flex items-center justify-center shrink-0 shadow-sm overflow-hidden p-1">
+                {activeVehicleState.carPhotoUrl ? (
+                  <img
+                    src={activeVehicleState.carPhotoUrl}
+                    alt="Vehículo"
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                ) : (
+                  renderMarchaVehicle3D(vehicleType, 36)
+                )}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center space-x-1.5 leading-tight flex-wrap gap-y-1">
                   <span className="text-xs font-black text-white truncate">
-                    {activeVehiclePreset.label}
+                    {activeVehicleState.vehicleModelName || activeVehiclePreset.label}
                   </span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-400 font-bold border border-sky-500/30 shrink-0">
                     {engineName}
@@ -1734,7 +1728,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                       isACActive ? 'text-cyan-300 animate-spin' : 'text-slate-400'
                     }`}
                   />
-                  <span className="font-black whitespace-nowrap">A/C CLIMA</span>
+                  <span className="font-black whitespace-nowrap">Aire A/C 💨</span>
                 </span>
 
                 {/* Tactile Switch Toggle */}
@@ -2261,35 +2255,66 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         </div>
       </main>
 
-      {/* ---------------- MODAL SELECCIONAR / CALIBRAR VEHÍCULO Y MOTORIZACIÓN (COMPACTO) ---------------- */}
+      {/* ---------------- MODAL SELECCIONAR / CALIBRAR VEHÍCULO Y MOTORIZACIÓN INVESTIGADA ---------------- */}
       {showVehicleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2.5">
                 <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
                   <Car className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white">Vehículo y Motorización</h3>
-                  <p className="text-[10px] text-slate-400">Calibra el consumo base del tacómetro</p>
+                  <h3 className="text-sm font-black text-white">Vehículo y Motorización Real</h3>
+                  <p className="text-[10px] text-slate-400">Datos técnicos investigados WLTP y consumo oficial</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowVehicleModal(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* 1. Category selector */}
+            {/* Modelos Populares por País (Acceso Rápido) */}
+            {DATA_PAIS[selectedCountry]?.cars && DATA_PAIS[selectedCountry].cars.length > 0 && (
+              <div className="p-3 rounded-2xl bg-[#080B11] border border-slate-800 space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                  <span>Autos Populares en {currentCountry.label}:</span>
+                  <span className="text-emerald-400 font-bold">{DATA_PAIS[selectedCountry].cars.length} modelos</span>
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {DATA_PAIS[selectedCountry].cars.slice(0, 4).map((car) => (
+                    <button
+                      key={car.id}
+                      type="button"
+                      onClick={() => {
+                        const targetCategory = UNIFIED_VEHICLE_CATALOG[car.bodyType] || UNIFIED_VEHICLE_CATALOG.sedan;
+                        const matchingEng = targetCategory.engines.find(e => e.displacement.includes(car.displacementL)) || targetCategory.engines[0];
+                        setModalTempVehicleType(car.bodyType);
+                        setModalTempVehicleModelName(`${car.brand} ${car.model}`);
+                        setModalTempEngineName(car.engine);
+                        setModalTempBaseL100(matchingEng.baseL100);
+                      }}
+                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left transition cursor-pointer active:scale-95 text-slate-200"
+                    >
+                      <div className="text-[11px] font-black truncate">{car.brand} {car.model}</div>
+                      <div className="text-[9px] text-sky-400 font-mono truncate">{car.engine}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 1. Categoría de Vehículo (Gráficas 3D Profesionales Reales) */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
-                1. Categoría de Vehículo
+                1. Categoría de Carrocería
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {VEHICLE_PRESETS.map((preset) => {
                   const isSel = modalTempVehicleType === preset.type;
                   return (
@@ -2298,19 +2323,25 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                       type="button"
                       onClick={() => {
                         setModalTempVehicleType(preset.type);
-                        setModalTempEngineName(preset.defaultEngine);
-                        setModalTempBaseL100(preset.defaultBaseL100);
+                        setModalTempVehicleModelName(preset.label);
+                        const defEng = preset.engines[1] || preset.engines[0];
+                        setModalTempEngineName(defEng.name);
+                        setModalTempBaseL100(defEng.baseL100);
                       }}
-                      className={`p-2.5 rounded-2xl border text-left transition flex items-center space-x-2 cursor-pointer ${
+                      className={`p-2 rounded-2xl border text-center transition flex flex-col items-center justify-between cursor-pointer active:scale-95 ${
                         isSel
-                          ? 'bg-sky-500/20 border-sky-400 text-white shadow-sm'
-                          : 'bg-[#1A2234] border-slate-700/80 text-slate-300 hover:border-slate-600'
+                          ? 'bg-sky-500/20 border-sky-400 text-white shadow-[0_0_15px_rgba(0,212,255,0.2)]'
+                          : 'bg-[#182030] border-slate-700/80 text-slate-300 hover:border-slate-600'
                       }`}
                     >
-                      <span className="text-lg">{preset.icon}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-black truncate">{preset.label.split('/')[0]}</div>
-                        <div className="text-[10px] text-slate-400">{preset.defaultBaseL100} L/100</div>
+                      <div className="w-12 h-10 flex items-center justify-center">
+                        {renderMarchaVehicle3D(preset.type, 42)}
+                      </div>
+                      <div className="text-[11px] font-black truncate w-full mt-1">
+                        {preset.shortLabel}
+                      </div>
+                      <div className="text-[9px] text-sky-400 font-mono font-bold">
+                        {preset.defaultBaseL100} L/100
                       </div>
                     </button>
                   );
@@ -2318,40 +2349,48 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* 2. Engine presets */}
+            {/* 2. Motorización Investigada para la categoría */}
             <div className="space-y-1.5 pt-1">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
-                2. Cilindrada / Motor
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>2. Motor & Cilindrada Investigada</span>
+                <span className="text-[10px] text-sky-400 font-bold">Datos idénticos a Calculadora</span>
               </label>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {(
-                  VEHICLE_PRESETS.find((v) => v.type === modalTempVehicleType)?.engines ||
-                  VEHICLE_PRESETS[1].engines
+                  UNIFIED_VEHICLE_CATALOG[modalTempVehicleType]?.engines ||
+                  UNIFIED_VEHICLE_CATALOG.sedan.engines
                 ).map((eng) => {
                   const isSel = modalTempEngineName === eng.name;
                   return (
                     <button
-                      key={eng.name}
+                      key={eng.key}
                       type="button"
                       onClick={() => {
                         setModalTempEngineName(eng.name);
                         setModalTempBaseL100(eng.baseL100);
                       }}
-                      className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-xs font-bold transition cursor-pointer ${
+                      className={`w-full p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between active:scale-98 ${
                         isSel
-                          ? 'bg-gradient-to-r from-sky-500/20 to-blue-600/20 border-sky-400 text-white'
-                          : 'bg-[#1A202C] border-slate-700/60 text-slate-300 hover:bg-[#252E3E]'
+                          ? 'bg-gradient-to-r from-sky-500/20 to-blue-600/20 border-sky-400 text-white shadow-sm'
+                          : 'bg-[#161D2B] border-slate-700/70 text-slate-300 hover:bg-[#1E2738]'
                       }`}
                     >
-                      <span>{eng.name}</span>
-                      <span className="font-mono text-sky-400 font-black">{eng.baseL100} L/100km</span>
+                      <div className="min-w-0 flex-1 pr-2">
+                        <div className="text-xs font-black truncate text-white">{eng.name}</div>
+                        <div className="text-[10px] text-slate-400 truncate mt-0.5">{eng.displacement} • {eng.powerCV}</div>
+                        <div className="text-[9px] text-slate-500 truncate mt-0.5">{eng.description}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="font-mono text-sky-400 font-black text-xs block">{eng.baseL100.toFixed(1)}</span>
+                        <span className="text-[9px] text-slate-500">L/100km</span>
+                      </div>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* 3. Transmission */}
+            {/* 3. Transmisión */}
             <div className="space-y-1.5 pt-1">
               <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
                 3. Transmisión
@@ -2384,24 +2423,32 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
             {/* Summary preview */}
             <div className="p-3 rounded-2xl bg-black/40 border border-slate-800 text-xs flex items-center justify-between">
-              <span className="text-slate-400">Consumo calibrado:</span>
-              <span className="font-mono font-black text-sky-400 text-sm">
-                {(modalTempBaseL100 * (modalTempTransmission === 'automatic' ? 1.08 : 1.0)).toFixed(1)} L/100km
-              </span>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Vehículo a sincronizar:</span>
+                <span className="font-bold text-white text-xs truncate">
+                  {modalTempVehicleModelName || modalTempEngineName}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-400 block text-[10px]">Consumo calibrado:</span>
+                <span className="font-mono font-black text-sky-400 text-sm">
+                  {(modalTempBaseL100 * (modalTempTransmission === 'automatic' ? 1.08 : 1.0)).toFixed(1)} L/100km
+                </span>
+              </div>
             </div>
 
             <div className="flex space-x-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowVehicleModal(false)}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700"
+                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleApplyVehicleConfig}
-                className="flex-1 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-md shadow-sky-500/25"
+                className="flex-1 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-md shadow-sky-500/25 cursor-pointer active:scale-95 transition"
               >
                 Aplicar y Sincronizar
               </button>
