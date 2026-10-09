@@ -81,15 +81,19 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
 CREATE POLICY "profiles_select_own" ON public.profiles
   FOR SELECT USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "profiles_insert_own" ON public.profiles;
 CREATE POLICY "profiles_insert_own" ON public.profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 CREATE POLICY "profiles_update_own" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "profiles_delete_own" ON public.profiles;
 CREATE POLICY "profiles_delete_own" ON public.profiles
   FOR DELETE USING (auth.uid() = id);
 
@@ -118,15 +122,19 @@ CREATE INDEX IF NOT EXISTS idx_vehicles_user_id ON public.vehicles(user_id);
 
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "vehicles_select_own" ON public.vehicles;
 CREATE POLICY "vehicles_select_own" ON public.vehicles
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "vehicles_insert_own" ON public.vehicles;
 CREATE POLICY "vehicles_insert_own" ON public.vehicles
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "vehicles_update_own" ON public.vehicles;
 CREATE POLICY "vehicles_update_own" ON public.vehicles
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "vehicles_delete_own" ON public.vehicles;
 CREATE POLICY "vehicles_delete_own" ON public.vehicles
   FOR DELETE USING (auth.uid() = user_id);
 
@@ -149,15 +157,19 @@ CREATE INDEX IF NOT EXISTS idx_fuel_settings_user_id ON public.fuel_settings(use
 
 ALTER TABLE public.fuel_settings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "fuel_settings_select_own" ON public.fuel_settings;
 CREATE POLICY "fuel_settings_select_own" ON public.fuel_settings
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "fuel_settings_insert_own" ON public.fuel_settings;
 CREATE POLICY "fuel_settings_insert_own" ON public.fuel_settings
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "fuel_settings_update_own" ON public.fuel_settings;
 CREATE POLICY "fuel_settings_update_own" ON public.fuel_settings
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "fuel_settings_delete_own" ON public.fuel_settings;
 CREATE POLICY "fuel_settings_delete_own" ON public.fuel_settings
   FOR DELETE USING (auth.uid() = user_id);
 
@@ -185,15 +197,19 @@ CREATE INDEX IF NOT EXISTS idx_trips_fecha ON public.trips(fecha DESC);
 
 ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "trips_select_own" ON public.trips;
 CREATE POLICY "trips_select_own" ON public.trips
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "trips_insert_own" ON public.trips;
 CREATE POLICY "trips_insert_own" ON public.trips
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "trips_update_own" ON public.trips;
 CREATE POLICY "trips_update_own" ON public.trips
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "trips_delete_own" ON public.trips;
 CREATE POLICY "trips_delete_own" ON public.trips
   FOR DELETE USING (auth.uid() = user_id);
 
@@ -221,15 +237,19 @@ CREATE INDEX IF NOT EXISTS idx_refuels_fecha ON public.refuels(fecha DESC);
 
 ALTER TABLE public.refuels ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "refuels_select_own" ON public.refuels;
 CREATE POLICY "refuels_select_own" ON public.refuels
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "refuels_insert_own" ON public.refuels;
 CREATE POLICY "refuels_insert_own" ON public.refuels
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "refuels_update_own" ON public.refuels;
 CREATE POLICY "refuels_update_own" ON public.refuels
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "refuels_delete_own" ON public.refuels;
 CREATE POLICY "refuels_delete_own" ON public.refuels
   FOR DELETE USING (auth.uid() = user_id);
 
@@ -256,15 +276,19 @@ CREATE INDEX IF NOT EXISTS idx_garage_records_user_id ON public.garage_records(u
 
 ALTER TABLE public.garage_records ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "garage_records_select_own" ON public.garage_records;
 CREATE POLICY "garage_records_select_own" ON public.garage_records
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "garage_records_insert_own" ON public.garage_records;
 CREATE POLICY "garage_records_insert_own" ON public.garage_records
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "garage_records_update_own" ON public.garage_records;
 CREATE POLICY "garage_records_update_own" ON public.garage_records
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "garage_records_delete_own" ON public.garage_records;
 CREATE POLICY "garage_records_delete_own" ON public.garage_records
   FOR DELETE USING (auth.uid() = user_id);
 
@@ -590,4 +614,118 @@ export const deleteSupabaseRefuel = async (refuelId: string) => {
     .eq('id', refuelId);
 
   if (error) console.warn('deleteSupabaseRefuel error:', error.message);
+};
+
+// ----------------- VEHICLES HELPERS -----------------
+
+export const getSupabaseVehicles = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('vehicles')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.warn('getSupabaseVehicles error:', error.message);
+    return [];
+  }
+  return data || [];
+};
+
+export const insertSupabaseVehicle = async (userId: string, vehicle: {
+  alias?: string;
+  marca?: string;
+  modelo?: string;
+  anio?: number;
+  matricula?: string;
+  tipo_vehiculo?: string;
+  transmision?: string;
+  tipo_combustible?: string;
+  consumo_base?: number;
+  odometro_actual?: number;
+  activo?: boolean;
+}) => {
+  const { data, error } = await supabase
+    .from('vehicles')
+    .insert([{
+      user_id: userId,
+      ...vehicle,
+    }])
+    .select();
+
+  if (error) console.warn('insertSupabaseVehicle error:', error.message);
+  return data?.[0] || null;
+};
+
+export const updateSupabaseVehicle = async (vehicleId: string, updates: any) => {
+  const { data, error } = await supabase
+    .from('vehicles')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', vehicleId)
+    .select();
+
+  if (error) console.warn('updateSupabaseVehicle error:', error.message);
+  return data?.[0] || null;
+};
+
+export const deleteSupabaseVehicle = async (vehicleId: string) => {
+  const { error } = await supabase
+    .from('vehicles')
+    .delete()
+    .eq('id', vehicleId);
+
+  if (error) console.warn('deleteSupabaseVehicle error:', error.message);
+};
+
+// ----------------- GARAGE RECORDS HELPERS -----------------
+
+export const getSupabaseGarageRecords = async (userId: string, categoria?: string) => {
+  let query = supabase
+    .from('garage_records')
+    .select('*')
+    .eq('user_id', userId);
+
+  if (categoria) {
+    query = query.eq('categoria', categoria);
+  }
+
+  const { data, error } = await query.order('fecha_registro', { ascending: false });
+
+  if (error) {
+    console.warn('getSupabaseGarageRecords error:', error.message);
+    return [];
+  }
+  return data || [];
+};
+
+export const insertSupabaseGarageRecord = async (userId: string, record: {
+  categoria: string;
+  titulo: string;
+  costo?: number;
+  odometro?: number;
+  fecha_registro?: string;
+  fecha_proxima?: string;
+  notas?: string;
+  foto_comprobante?: string;
+  datos_extra?: any;
+}) => {
+  const { data, error } = await supabase
+    .from('garage_records')
+    .insert([{
+      user_id: userId,
+      ...record,
+    }])
+    .select();
+
+  if (error) console.warn('insertSupabaseGarageRecord error:', error.message);
+  return data?.[0] || null;
+};
+
+export const deleteSupabaseGarageRecord = async (recordId: string) => {
+  const { error } = await supabase
+    .from('garage_records')
+    .delete()
+    .eq('id', recordId);
+
+  if (error) console.warn('deleteSupabaseGarageRecord error:', error.message);
 };

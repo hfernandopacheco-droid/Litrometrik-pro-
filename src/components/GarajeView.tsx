@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { CountryCode, DATA_PAIS } from '../utils/countryData';
 import { fetchCloudRecords } from '../utils/firestoreService';
+import { getSupabaseGarageRecords } from '../utils/supabaseClient';
 
 interface GarajeViewProps {
   onSelectCategory: (category: 'mantenimiento' | 'neumaticos' | 'tramites') => void;
@@ -98,17 +99,46 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
       lList = JSON.parse(localStorage.getItem(`litrometrik_${uid}_tramites`) || '[]');
     } catch (_) {}
 
-    // Check cloud if user signed in
+    // Check cloud & Supabase if user signed in
     if (currentUser?.uid && currentUser.uid !== 'guest' && currentUser.uid !== 'guest_user') {
       try {
-        const [cloudM, cloudT, cloudL] = await Promise.all([
+        const [cloudM, cloudT, cloudL, sbRecords] = await Promise.all([
           fetchCloudRecords(currentUser.uid, 'mantenimientos'),
           fetchCloudRecords(currentUser.uid, 'neumaticos'),
           fetchCloudRecords(currentUser.uid, 'tramites'),
+          getSupabaseGarageRecords(currentUser.uid),
         ]);
         if (cloudM.length > 0) mList = cloudM.filter((r: any) => !r.pais || r.pais === selectedCountry);
         if (cloudT.length > 0) tList = cloudT.filter((r: any) => !r.pais || r.pais === selectedCountry);
         if (cloudL.length > 0) lList = cloudL.filter((r: any) => !r.pais || r.pais === selectedCountry);
+
+        if (sbRecords && sbRecords.length > 0) {
+          sbRecords.forEach((sr: any) => {
+            const mapped = {
+              id: sr.id,
+              date: sr.fecha_registro,
+              title: sr.titulo,
+              cost: Number(sr.costo) || 0,
+              odometer: Number(sr.odometro) || 0,
+              notes: sr.notas,
+              receiptUrl: sr.foto_comprobante,
+              ...(sr.datos_extra || {}),
+            };
+            if (sr.categoria === 'mantenimiento') {
+              if (!mList.some((x) => x.id === sr.id)) {
+                mList.push({ ...mapped, nextServiceDate: sr.fecha_proxima, serviceType: sr.titulo });
+              }
+            } else if (sr.categoria === 'neumaticos') {
+              if (!tList.some((x) => x.id === sr.id)) {
+                tList.push({ ...mapped, nextCheckDate: sr.fecha_proxima, tireType: sr.titulo });
+              }
+            } else if (sr.categoria === 'tramites') {
+              if (!lList.some((x) => x.id === sr.id)) {
+                lList.push({ ...mapped, expiryDate: sr.fecha_proxima, tramiteType: sr.titulo });
+              }
+            }
+          });
+        }
       } catch (_) {}
     }
 

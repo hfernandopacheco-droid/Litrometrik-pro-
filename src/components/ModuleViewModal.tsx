@@ -30,7 +30,14 @@ import { getStoredActiveUser, subscribeToAuth } from '../utils/firebaseAuth';
 import { DATA_PAIS, CountryCode } from '../utils/countryData';
 import { processImageFile } from '../utils/imageUtils';
 import { ImageViewerModal } from './ImageViewerModal';
-import { insertSupabaseRefuel } from '../utils/supabaseClient';
+import {
+  insertSupabaseRefuel,
+  deleteSupabaseRefuel,
+  insertSupabaseGarageRecord,
+  deleteSupabaseGarageRecord,
+  getSupabaseRefuels,
+  getSupabaseGarageRecords,
+} from '../utils/supabaseClient';
 
 export type SupportedCountry = CountryCode;
 export type ModuleKey = 'refuels' | 'maintenance' | 'tires' | 'legal';
@@ -648,7 +655,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
     }
   };
 
-  // Live Firestore listener when user is authenticated
+  // Live Firestore & Supabase fetch when user is authenticated
   useEffect(() => {
     if (!currentUser?.uid || currentUser.uid === 'guest_user' || currentUser.uid === 'guest') return;
     const collections: CloudCollection[] = ['repostajes', 'mantenimientos', 'neumaticos', 'tramites'];
@@ -663,6 +670,62 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
         }
       })
     );
+
+    // Also fetch records from Supabase
+    Promise.all([
+      getSupabaseRefuels(currentUser.uid),
+      getSupabaseGarageRecords(currentUser.uid),
+    ]).then(([sbRefuels, sbGarage]) => {
+      const sbMapped: AnyRecord[] = [];
+      if (sbRefuels && sbRefuels.length > 0) {
+        sbRefuels.forEach((r: any) => {
+          sbMapped.push({
+            id: r.id,
+            createdAt: r.fecha || r.created_at,
+            categoria: 'bitacora',
+            pais: (r.pais as SupportedCountry) || 'PL',
+            moneda: 'PLN',
+            odometer: Number(r.odometro) || 0,
+            cost: Number(r.costo_total) || 0,
+            title: `Repostaje ${r.estacion || 'Estación'}`,
+            station: r.estacion || 'Estación de Servicio',
+            fuelType: r.combustible || 'Gas GLP / LPG',
+            liters: Number(r.litros) || 0,
+            pricePerLiter: Number(r.precio_por_litro) || 0,
+            refuelDate: r.fecha ? r.fecha.split('T')[0] : new Date().toISOString().split('T')[0],
+            notes: r.notas,
+            receiptUrl: r.foto_recibo,
+          } as RefuelRecord);
+        });
+      }
+      if (sbGarage && sbGarage.length > 0) {
+        sbGarage.forEach((g: any) => {
+          const base = {
+            id: g.id,
+            createdAt: g.fecha_registro || g.created_at,
+            categoria: g.categoria as RecordCategory,
+            pais: (g.pais as SupportedCountry) || 'PL',
+            moneda: 'PLN',
+            odometer: Number(g.odometro) || 0,
+            cost: Number(g.costo) || 0,
+            title: g.titulo,
+            notes: g.notas,
+            receiptUrl: g.foto_comprobante,
+            ...(g.datos_extra || {}),
+          };
+          sbMapped.push(base as AnyRecord);
+        });
+      }
+      if (sbMapped.length > 0) {
+        setAllRecords((prev) => {
+          const map = new Map<string, AnyRecord>();
+          prev.forEach((item) => map.set(item.id, item));
+          sbMapped.forEach((item) => map.set(item.id, item));
+          return Array.from(map.values());
+        });
+      }
+    }).catch(() => {});
+
     return () => {
       unsubs.forEach((u) => u && u());
     };
@@ -933,6 +996,18 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
             notas: refuelNotes,
             foto_recibo: attachedPhoto?.url,
           }).catch((err) => console.warn('Supabase refuel save warning:', err));
+        } else {
+          insertSupabaseGarageRecord(uid, {
+            categoria: categoriaActual,
+            titulo: newRecord.title || categoriaActual,
+            costo: Number(newRecord.cost) || 0,
+            odometro: Number(newRecord.odometer) || 0,
+            fecha_registro: newRecord.createdAt || new Date().toISOString(),
+            fecha_proxima: (newRecord as any).nextServiceDate || (newRecord as any).nextCheckDate || (newRecord as any).expiryDate || null,
+            notas: newRecord.notes,
+            foto_comprobante: attachedPhoto?.url,
+            datos_extra: newRecord,
+          }).catch((err) => console.warn('Supabase garage record save warning:', err));
         }
       }
     } catch (e) {
@@ -1029,6 +1104,8 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
       } catch (err) {}
       if (uid && uid !== 'guest' && uid !== 'guest_user') {
         deleteCloudRecord(uid, col as CloudCollection, id);
+        deleteSupabaseRefuel(id).catch(() => {});
+        deleteSupabaseGarageRecord(id).catch(() => {});
       }
     });
 
