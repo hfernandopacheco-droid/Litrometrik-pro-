@@ -216,17 +216,17 @@ const DEFAULT_SEED_RECORDS: AnyRecord[] = [
     moneda: 'PLN',
     odometer: 145500,
     cost: 101.15,
-    title: 'Repostaje Orlen (Gas GLP)',
+    title: 'Repostaje Orlen (Gas LPG)',
     station: 'Orlen Kraków',
-    fuelType: 'GLP',
+    fuelType: 'LPG',
     liters: 35.0,
     pricePerLiter: 2.89,
     kmSinceLastRefuel: 380,
     consumptionL100: 9.21,
     refuelDate: '2026-09-28',
-    notes: 'Tanque lleno con gas GLP. Rendimiento óptimo en autopista A4.',
+    notes: 'Tanque lleno con gas LPG. Rendimiento óptimo en autopista A4.',
     receiptUrl: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=400&q=80',
-    receiptName: 'ticket_orlen_glp.jpg'
+    receiptName: 'ticket_orlen_lpg.jpg'
   },
   {
     id: 'seed_refuel_2',
@@ -276,15 +276,15 @@ const DEFAULT_SEED_RECORDS: AnyRecord[] = [
     moneda: 'EUR',
     odometer: 120400,
     cost: 37.60,
-    title: 'Repostaje Repsol (Autogás GLP)',
+    title: 'Repostaje Repsol (Autogás LPG)',
     station: 'Repsol Madrid',
-    fuelType: 'GLP',
+    fuelType: 'LPG',
     liters: 40.0,
     pricePerLiter: 0.94,
     kmSinceLastRefuel: 420,
     consumptionL100: 9.52,
     refuelDate: '2026-09-22',
-    notes: 'Carga completa GLP en estación M-40.',
+    notes: 'Carga completa LPG en estación M-40.',
   },
   {
     id: 'seed_refuel_5',
@@ -296,7 +296,7 @@ const DEFAULT_SEED_RECORDS: AnyRecord[] = [
     cost: 576.00,
     title: 'Repostaje Pemex (Gas LP)',
     station: 'Pemex CDMX',
-    fuelType: 'GLP',
+    fuelType: 'LPG',
     liters: 45.0,
     pricePerLiter: 12.80,
     kmSinceLastRefuel: 440,
@@ -333,14 +333,14 @@ const DEFAULT_SEED_RECORDS: AnyRecord[] = [
     moneda: 'PLN',
     odometer: 140000,
     cost: 150.00,
-    title: 'Filtro GLP / Gas - LPG Serwis Katowice',
-    serviceType: 'Filtro GLP / Gas',
+    title: 'Filtro LPG / Gas - LPG Serwis Katowice',
+    serviceType: 'Filtro LPG / Gas',
     productBrand: 'Certools F-779/D Bulpren + Czyszczenie',
     workshop: 'LPG Serwis Katowice',
     serviceDate: '2026-08-10',
     nextServiceKm: 150000,
     nextServiceDate: '2027-08-10',
-    notes: 'Sustitución de filtros de fase líquida y gaseosa para instalación GLP.',
+    notes: 'Sustitución de filtros de fase líquida y gaseosa para instalación LPG.',
   },
   {
     id: 'seed_maint_3',
@@ -450,7 +450,7 @@ const DEFAULT_SEED_RECORDS: AnyRecord[] = [
     expiryDate: '2027-09-01',
     daysRemaining: 335,
     status: 'vigente',
-    notes: 'Inspección vehicular periódica aprobada sin fallas (incluye prueba de gas GLP).',
+    notes: 'Inspección vehicular periódica aprobada sin fallas (incluye prueba de gas LPG).',
     receiptUrl: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=400&q=80',
     receiptName: 'przeglad_skp_cert.pdf'
   },
@@ -689,7 +689,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
             cost: Number(r.costo_total) || 0,
             title: `Repostaje ${r.estacion || 'Estación'}`,
             station: r.estacion || 'Estación de Servicio',
-            fuelType: r.combustible || 'Gas GLP / LPG',
+            fuelType: r.combustible || 'Gas LPG',
             liters: Number(r.litros) || 0,
             pricePerLiter: Number(r.precio_por_litro) || 0,
             refuelDate: r.fecha ? r.fecha.split('T')[0] : new Date().toISOString().split('T')[0],
@@ -770,7 +770,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
   // Form states per category - Free clean inputs without locked zeros
   // A) Bitácora
   const [refuelStation, setRefuelStation] = useState(() => currentCountryData.gasolineras[0] || 'Orlen');
-  const [refuelFuelType, setRefuelFuelType] = useState('GLP');
+  const [refuelFuelType, setRefuelFuelType] = useState('LPG');
   const [refuelLiters, setRefuelLiters] = useState<number | ''>('');
   const [refuelPricePerLiter, setRefuelPricePerLiter] = useState<number | ''>(() => currentCountryData.preciosDefecto.lpg);
   const [refuelCost, setRefuelCost] = useState<number | ''>('');
@@ -785,7 +785,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
     if (cData.gasolineras.length > 0) {
       setRefuelStation(cData.gasolineras[0]);
     }
-    if (refuelFuelType === 'GLP') {
+    if (refuelFuelType === 'LPG') {
       setRefuelPricePerLiter(cData.preciosDefecto.lpg);
     } else if (refuelFuelType.includes('Diésel')) {
       setRefuelPricePerLiter(cData.preciosDefecto.diesel);
@@ -1190,7 +1190,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
     },
     mantenimiento: {
       title: 'Mantenimiento Preventivo',
-      subtitle: 'Servicios de motor, aceites, bujías, filtros GLP y facturas de taller',
+      subtitle: 'Servicios de motor, aceites, bujías, filtros LPG y facturas de taller',
       icon: Wrench,
       badge: 'Taller y Servicios',
     },
@@ -1399,7 +1399,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
                           onChange={(e) => setRefuelFuelType(e.target.value)}
                           className="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         >
-                          <option value="GLP">⛽ {currentCountryData.etiquetasCombustible.lpg}</option>
+                          <option value="LPG">⛽ {currentCountryData.etiquetasCombustible.lpg}</option>
                           <option value="Gasolina">⛽ {currentCountryData.etiquetasCombustible.gasolina}</option>
                           <option value="Gasolina 98">⛽ Gasolina 98 / Premium</option>
                           <option value="Diésel">🛢️ {currentCountryData.etiquetasCombustible.diesel}</option>
@@ -1496,7 +1496,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
                         <option value="Aceite y Filtro">🛢️ Cambio de Aceite y Filtro</option>
                         <option value="Frenos y Pastillas">🛑 Pastillas y Discos de Freno</option>
                         <option value="Bujías / Ignición">⚡ Bujías y Bobinas</option>
-                        <option value="Filtro GLP / Gas">⛽ Filtro de Gas GLP Fase Líquida/Vapor</option>
+                        <option value="Filtro LPG / Gas">⛽ Filtro de Gas LPG Fase Líquida/Vapor</option>
                         <option value="Correa Distribución">⚙️ Kit de Distribución y Bomba</option>
                         <option value="Suspensión y Amortiguadores">🚗 Suspensión / Amortiguadores</option>
                         <option value="Batería">🔋 Batería / Alternador</option>
@@ -1660,7 +1660,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
                         <option value="Przegląd">📋 Inspección Técnica (Przegląd / ITV / RTM)</option>
                         <option value="SOAT">🛡️ Seguro Obligatorio (SOAT / OC)</option>
                         <option value="Todo Riesgo">💎 Seguro Todo Riesgo (AC / Autocasco)</option>
-                        <option value="TDT GLP">⛽ Homologación TDT Cilindro GLP</option>
+                        <option value="TDT LPG">⛽ Homologación TDT Cilindro LPG</option>
                         <option value="Verificación">🌿 Verificación Ambiental</option>
                         <option value="Impuestos">🏛️ Impuesto Vehicular / Tenencia</option>
                       </select>

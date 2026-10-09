@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS public.fuel_settings (
   pb95 NUMERIC(6,2) DEFAULT 6.09,
   glp NUMERIC(6,2) DEFAULT 2.89,
   diesel NUMERIC(6,2) DEFAULT 6.19,
-  combustible_activo TEXT DEFAULT 'Gas GLP / LPG',
+  combustible_activo TEXT DEFAULT 'Gas LPG',
   saldo_tanque NUMERIC(8,2) DEFAULT 0,
   pais TEXT DEFAULT 'PL',
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -316,7 +316,7 @@ BEGIN
     6.09,
     2.89,
     6.19,
-    'Gas GLP / LPG',
+    'Gas LPG',
     0,
     'PL'
   )
@@ -380,7 +380,7 @@ export const signUpWithSupabase = async (
         pb95: 6.09,
         glp: 2.89,
         diesel: 6.19,
-        combustible_activo: 'Gas GLP / LPG',
+        combustible_activo: 'Gas LPG',
         saldo_tanque: 0,
         pais: 'PL',
         updated_at: new Date().toISOString(),

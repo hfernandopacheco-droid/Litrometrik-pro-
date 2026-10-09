@@ -17,7 +17,7 @@ export interface CarModelSpec {
   engine: string;
   displacementL: string;
   bodyType: 'compact' | 'sedan' | 'suv' | 'van' | 'pickup';
-  defaultFuel: 'GLP' | 'Gasolina' | 'Gasolina 98' | 'Diésel' | 'GNV';
+  defaultFuel: 'LPG' | 'GLP' | 'Gasolina' | 'Gasolina 98' | 'Diésel' | 'GNV';
   badge?: string;
 }
 
@@ -90,7 +90,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
     unidadConsumo: 'L/100km',
     gasolineras: ['Orlen', 'BP Polska', 'Shell Polska', 'Circle K', 'Moya', 'Lotos', 'Amic Energy', 'Avia'],
     preciosDefecto: { gasolina: 6.09, diesel: 6.15, lpg: 2.89 },
-    etiquetasCombustible: { gasolina: 'Gasolina Pb95', diesel: 'Diésel ON', lpg: 'Gas GLP / LPG' },
+    etiquetasCombustible: { gasolina: 'Gasolina Pb95', diesel: 'Diésel ON', lpg: 'Gas LPG' },
     ciudadesRutasEjemplo: ['Varsovia a Cracovia (A4)', 'Gdansk a Varsovia (S7)', 'Wrocław a Poznań (S5)'],
     Compacto: {
       ejemplos: "Toyota Yaris, Fiat 500, Skoda Fabia",
@@ -120,10 +120,10 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
       queEs: "Grande / SUV / Camioneta Alta: Carro alto, familiar, 4x4, baúl grande"
     },
     cars: [
-      { id: 'pl-mazda-3-16-glp', brand: 'Mazda', model: 'Mazda 3 1.6 MPI (GLP)', engine: '1.6L MZR 105 CV Gas GLP / PB', displacementL: '1.6', bodyType: 'sedan', defaultFuel: 'GLP', badge: 'Mazda 1.6 GLP' },
-      { id: 'pl-skoda-octavia-glp', brand: 'Skoda', model: 'Octavia 1.6 MPI (GLP)', engine: '1.6L MPI 102 CV Gas GLP', displacementL: '1.6', bodyType: 'sedan', defaultFuel: 'GLP', badge: 'Top Ventas GLP' },
+      { id: 'pl-mazda-3-16-glp', brand: 'Mazda', model: 'Mazda 3 1.6 MPI (LPG)', engine: '1.6L MZR 105 CV Gas LPG / PB', displacementL: '1.6', bodyType: 'sedan', defaultFuel: 'LPG', badge: 'Mazda 1.6 LPG' },
+      { id: 'pl-skoda-octavia-glp', brand: 'Skoda', model: 'Octavia 1.6 MPI (LPG)', engine: '1.6L MPI 102 CV Gas LPG', displacementL: '1.6', bodyType: 'sedan', defaultFuel: 'LPG', badge: 'Top Ventas LPG' },
       { id: 'pl-toyota-corolla-hybrid', brand: 'Toyota', model: 'Corolla 1.8 Hybrid', engine: '1.8L Hybrid 140 CV', displacementL: '1.8', bodyType: 'sedan', defaultFuel: 'Gasolina', badge: 'Híbrido Ahorro' },
-      { id: 'pl-dacia-duster-glp', brand: 'Dacia', model: 'Duster 1.0 ECO-G (GLP)', engine: '1.0L TCe ECO-G 100 CV Bi-Fuel GLP', displacementL: '1.0', bodyType: 'suv', defaultFuel: 'GLP', badge: 'GLP Original' },
+      { id: 'pl-dacia-duster-glp', brand: 'Dacia', model: 'Duster 1.0 ECO-G (LPG)', engine: '1.0L TCe ECO-G 100 CV Bi-Fuel LPG', displacementL: '1.0', bodyType: 'suv', defaultFuel: 'LPG', badge: 'LPG Original' },
       { id: 'pl-vw-golf-tdi', brand: 'Volkswagen', model: 'Golf 2.0 TDI', engine: '2.0L TDI 150 CV', displacementL: '2.0', bodyType: 'compact', defaultFuel: 'Diésel' },
       { id: 'pl-kia-sportage', brand: 'Kia', model: 'Sportage 1.6 T-GDI', engine: '1.6L Turbo T-GDI 150 CV', displacementL: '1.6', bodyType: 'suv', defaultFuel: 'Gasolina' }
     ],
@@ -135,7 +135,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
         entity: 'Stacja Kontroli Pojazdów (SKP)',
         frequency: 'Anual (12 meses)',
         defaultCost: 99.00,
-        description: 'Inspección técnica anual obligatoria en Polonia. Incluye revisión de frenos, gases y prueba de estanqueidad para instalación GLP/LPG.'
+        description: 'Inspección técnica anual obligatoria en Polonia. Incluye revisión de frenos, gases y prueba de estanqueidad para instalación LPG.'
       },
       {
         id: 'pl_ubezpieczenie_oc',
@@ -153,7 +153,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
         entity: 'Transportowy Dozór Techniczny (TDT)',
         frequency: 'Cada 10 años',
         defaultCost: 250.00,
-        description: 'Certificación oficial de legalidad y prueba de presión del tanque de gas GLP / Autogaz.'
+        description: 'Certificación oficial de legalidad y prueba de presión del tanque de gas LPG / Autogaz.'
       },
       {
         id: 'pl_dowod_rejestracyjny',
@@ -177,7 +177,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
       },
       {
         id: 'pl_maint_glp',
-        serviceType: 'Filtros y Calibración GLP',
+        serviceType: 'Filtros y Calibración LPG',
         productBrand: 'Certools F-779/D Bulpren + KME Diego',
         workshop: 'LPG Serwis Katowice',
         intervalKm: 15000,
@@ -215,7 +215,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
     unidadConsumo: 'L/100km',
     gasolineras: ['Terpel', 'Primax', 'Texaco', 'Biomax', 'Petromil', 'Mobil Colombia', 'Esso', 'Brio'],
     preciosDefecto: { gasolina: 4200, diesel: 4350, lpg: 2400 },
-    etiquetasCombustible: { gasolina: 'Gasolina Corriente', diesel: 'Diésel / ACPM', lpg: 'Gas GNV / GLP Vehicular' },
+    etiquetasCombustible: { gasolina: 'Gasolina Corriente', diesel: 'Diésel / ACPM', lpg: 'Gas GNV / LPG Vehicular' },
     ciudadesRutasEjemplo: ['Bogotá a Medellín (Autopista Medellín)', 'Cali a Buenaventura', 'Barranquilla a Cartagena (Vía al Mar)'],
     Compacto: {
       ejemplos: "Renault Kwid, Kia Picanto, Chevrolet Spark GT",
@@ -282,7 +282,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
       },
       {
         id: 'co_certificacion_gas',
-        title: 'Certificación Anual Kit Gas GNV/GLP',
+        title: 'Certificación Anual Kit Gas GNV/LPG',
         tramiteType: 'Certificación Gas',
         entity: 'Organismo de Certificación Acreditado (ONAC)',
         frequency: 'Anual',
@@ -465,7 +465,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
     unidadConsumo: 'L/100km',
     gasolineras: ['Repsol', 'Cepsa', 'BP España', 'Galp', 'Shell España', 'Ballenoil', 'Plenoil', 'Petronor'],
     preciosDefecto: { gasolina: 1.58, diesel: 1.45, lpg: 0.95 },
-    etiquetasCombustible: { gasolina: 'Gasolina 95', diesel: 'Diésel / Gasóleo A', lpg: 'Autogás GLP' },
+    etiquetasCombustible: { gasolina: 'Gasolina 95', diesel: 'Diésel / Gasóleo A', lpg: 'Autogás LPG' },
     ciudadesRutasEjemplo: ['Madrid a Valencia (A-3)', 'Barcelona a Zaragoza (AP-2)', 'Sevilla a Málaga (A-92)'],
     Compacto: {
       ejemplos: "Seat Ibiza, Renault Clio, Peugeot 208",
@@ -496,10 +496,10 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
     },
     cars: [
       { id: 'es-seat-ibiza-tsi', brand: 'Seat', model: 'Ibiza 1.0 TSI', engine: '1.0L TSI 110 CV Gasolina', displacementL: '1.0', bodyType: 'compact', defaultFuel: 'Gasolina', badge: 'Top España' },
-      { id: 'es-dacia-sandero-glp', brand: 'Dacia', model: 'Sandero 1.0 ECO-G (GLP)', engine: '1.0L ECO-G 100 CV Etiqueta ECO GLP', displacementL: '1.0', bodyType: 'compact', defaultFuel: 'GLP', badge: 'N°1 Ventas GLP' },
+      { id: 'es-dacia-sandero-glp', brand: 'Dacia', model: 'Sandero 1.0 ECO-G (LPG)', engine: '1.0L ECO-G 100 CV Etiqueta ECO LPG', displacementL: '1.0', bodyType: 'compact', defaultFuel: 'LPG', badge: 'N°1 Ventas LPG' },
       { id: 'es-toyota-corolla-hybrid', brand: 'Toyota', model: 'Corolla 1.8 Hybrid', engine: '1.8L Híbrido 140 CV Etiqueta ECO', displacementL: '1.8', bodyType: 'compact', defaultFuel: 'Gasolina', badge: 'Etiqueta ECO' },
       { id: 'es-cupra-formentor-tsi', brand: 'Cupra', model: 'Formentor 1.5 TSI', engine: '1.5L TSI 150 CV', displacementL: '1.5', bodyType: 'suv', defaultFuel: 'Gasolina' },
-      { id: 'es-renault-clio-glp', brand: 'Renault', model: 'Clio 1.0 TCe GLP', engine: '1.0L Turbo GLP 100 CV', displacementL: '1.0', bodyType: 'compact', defaultFuel: 'GLP' },
+      { id: 'es-renault-clio-glp', brand: 'Renault', model: 'Clio 1.0 TCe LPG', engine: '1.0L Turbo LPG 100 CV', displacementL: '1.0', bodyType: 'compact', defaultFuel: 'LPG' },
       { id: 'es-hyundai-tucson-crdi', brand: 'Hyundai', model: 'Tucson 1.6 CRDi 48V', engine: '1.6L Diésel Mild-Hybrid 136 CV', displacementL: '1.6', bodyType: 'suv', defaultFuel: 'Diésel' }
     ],
     tramitesLegales: [
@@ -532,9 +532,9 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
       },
       {
         id: 'es_revision_glp',
-        title: 'Inspección y Estanqueidad Autogás GLP',
-        tramiteType: 'Revisión GLP',
-        entity: 'Taller Homologado Instalador GLP',
+        title: 'Inspección y Estanqueidad Autogás LPG',
+        tramiteType: 'Revisión LPG',
+        entity: 'Taller Homologado Instalador LPG',
         frequency: 'Anual / Cada 20.000 km',
         defaultCost: 75.00,
         description: 'Certificado de revisión de válvulas, electroválvula de corte y estanqueidad del circuito de gas.'
@@ -561,7 +561,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
       },
       {
         id: 'es_maint_autogas',
-        serviceType: 'Filtro Fase Gaseosa GLP',
+        serviceType: 'Filtro Fase Gaseosa LPG',
         productBrand: 'Filtro Gas Landi Renzo / BRC',
         workshop: 'Taller Gas AutoGas Alcalá',
         intervalKm: 20000,

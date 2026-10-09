@@ -44,7 +44,7 @@ export const UNIFIED_VEHICLE_CATALOG: Record<string, UnifiedVehicleCategory> = {
         powerCV: '95 - 110 CV',
         baseL100: 5.4,
         description: 'Motor downsized ultra-eficiente con inyección directa y turbo. Consumo urbano contenido.',
-        fuelRecommendation: 'Gasolina Pb95 / GLP',
+        fuelRecommendation: 'Gasolina Pb95 / LPG',
       },
       {
         key: 'comp_12_14_std',
@@ -53,7 +53,7 @@ export const UNIFIED_VEHICLE_CATALOG: Record<string, UnifiedVehicleCategory> = {
         powerCV: '85 - 125 CV',
         baseL100: 6.0,
         description: 'Mecánica atmosférica o turbo de baja presión. Rendimiento probado y excelente longevidad.',
-        fuelRecommendation: 'Gasolina Pb95 / GLP',
+        fuelRecommendation: 'Gasolina Pb95 / LPG',
       },
       {
         key: 'comp_15_16_sport',
@@ -89,8 +89,8 @@ export const UNIFIED_VEHICLE_CATALOG: Record<string, UnifiedVehicleCategory> = {
         displacement: '1.598 cc • 4 Cilindros DOHC',
         powerCV: '102 - 115 CV',
         baseL100: 7.2,
-        description: 'Motor atmosférico de alta resistencia, óptimo para instalación de kit GLP/LPG y crucero en autopista.',
-        fuelRecommendation: 'Gasolina Pb95 / GLP',
+        description: 'Motor atmosférico de alta resistencia, óptimo para instalación de kit LPG y crucero en autopista.',
+        fuelRecommendation: 'Gasolina Pb95 / LPG',
       },
       {
         key: 'sedan_20_skyactiv',
@@ -99,7 +99,7 @@ export const UNIFIED_VEHICLE_CATALOG: Record<string, UnifiedVehicleCategory> = {
         powerCV: '145 - 165 CV',
         baseL100: 8.2,
         description: 'Equilibrio perfecto de la gama media con alto ratio de compresión y empuje lineal.',
-        fuelRecommendation: 'Gasolina Pb95 / GLP',
+        fuelRecommendation: 'Gasolina Pb95 / LPG',
       },
       {
         key: 'sedan_25_turbo',
@@ -136,7 +136,7 @@ export const UNIFIED_VEHICLE_CATALOG: Record<string, UnifiedVehicleCategory> = {
         powerCV: '100 - 130 CV',
         baseL100: 6.8,
         description: 'Motor turbo moderno downsized de alta eficiencia para crossovers urbanos y carretera plana.',
-        fuelRecommendation: 'Gasolina Pb95 / GLP',
+        fuelRecommendation: 'Gasolina Pb95 / LPG',
       },
       {
         key: 'suv_15_20_fwd',
@@ -145,7 +145,7 @@ export const UNIFIED_VEHICLE_CATALOG: Record<string, UnifiedVehicleCategory> = {
         powerCV: '150 - 180 CV',
         baseL100: 8.8,
         description: 'Tracción delantera equilibrada para uso familiar, viajes interurbanos y topografía mixta.',
-        fuelRecommendation: 'Gasolina Pb95 / GLP',
+        fuelRecommendation: 'Gasolina Pb95 / LPG',
       },
       {
         key: 'suv_20_25_awd',

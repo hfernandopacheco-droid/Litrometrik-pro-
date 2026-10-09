@@ -633,12 +633,6 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
                 </p>
               </div>
             </div>
-
-            {/* Quick sync indicator */}
-            <div className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[10px] text-emerald-400 font-bold shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Sincronizado con Marcha</span>
-            </div>
           </div>
 
           {/* FOTO DEL CARRO O GRÁFICA 3D PROFESIONAL REAL CON OPCIÓN DE CÁMARA O GALERÍA */}

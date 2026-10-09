@@ -150,7 +150,7 @@ export function calculateDetailedTrip(inputs: CalculatorInputs): DetailedCalcula
   const litDie = (effectiveDistance * rateDie) / 100;
   const costDie = litDie * priceDie;
 
-  // Fuel 3: Gas GLP / LPG (factor x1.20 + 0.3L gasoline cold start per leg)
+  // Fuel 3: Gas LPG (factor x1.20 + 0.3L gasoline cold start per leg)
   const rateGlp = (activeBaseConsumption * transmissionFactor * 1.20 * routeFactor) + acAddon;
   const litGlp = (effectiveDistance * rateGlp) / 100;
   const coldStartGlp = 0.3 * priceGas * legs;
@@ -197,7 +197,7 @@ export function calculateDetailedTrip(inputs: CalculatorInputs): DetailedCalcula
 
   const itemGlp: FuelComparisonItem = {
     key: 'glp',
-    label: countryConfig.etiquetasCombustible?.lpg || 'Gas GLP / Autogas',
+    label: countryConfig.etiquetasCombustible?.lpg || 'Gas LPG / Autogas',
     subLabel: 'Máximo Ahorro Económico',
     rateL100: rateGlp,
     totalLiters: litGlp,

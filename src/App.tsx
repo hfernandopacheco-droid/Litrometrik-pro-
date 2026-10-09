@@ -109,7 +109,7 @@ export default function App() {
               country: (ct.pais as CountryCode) || 'PL',
               vehicleType: 'sedan',
               transmission: 'manual',
-              fuelType: ct.combustible_usado || 'Gas GLP / LPG',
+              fuelType: ct.combustible_usado || 'Gas LPG',
               routeType: 'mixto',
               distanceKm: Number(ct.distancia_km) || 0,
               isRoundTrip: false,
@@ -257,7 +257,7 @@ export default function App() {
           const isMatchingFuel =
             (prev.fuelType === 'gasolina' && fuel === 'Gasolina Pb95') ||
             (prev.fuelType === 'diesel' && fuel === 'Diésel ON') ||
-            ((prev.fuelType === 'lpg' || prev.fuelType === 'glp') && fuel === 'Gas GLP / LPG');
+            ((prev.fuelType === 'lpg' || prev.fuelType === 'glp') && (fuel === 'Gas LPG' || fuel === 'Gas GLP / LPG'));
           if (isMatchingFuel) {
             return { ...prev, pricePerLiter: price };
           }

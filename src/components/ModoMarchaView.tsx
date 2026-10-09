@@ -62,7 +62,17 @@ import {
 } from './Vehicle3DIcons';
 
 export type TimeFilterPeriod = 'DIA' | 'SEMANA' | 'MES' | 'ANO';
-export type FuelKey = 'Gasolina Pb95' | 'Diésel ON' | 'Gas GLP / LPG';
+export type FuelKey = 'Gasolina Pb95' | 'Diésel ON' | 'Gas LPG';
+
+export interface FuelTankData {
+  balance: number;
+  liters: number;
+  lastRefuelAmount?: number;
+  lastRefuelPrice?: number;
+  lastRefuelDate?: string;
+}
+
+export type FuelTankMap = Record<FuelKey, FuelTankData>;
 
 interface ModoMarchaViewProps {
   selectedCountry: CountryCode;
@@ -97,10 +107,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   currentUser,
 }) => {
   const defaultPrices: Record<CountryCode, Record<FuelKey, number>> = {
-    PL: { 'Gasolina Pb95': 6.09, 'Diésel ON': 6.15, 'Gas GLP / LPG': 2.89 },
-    CO: { 'Gasolina Pb95': 3900, 'Diésel ON': 4100, 'Gas GLP / LPG': 2500 },
-    ES: { 'Gasolina Pb95': 1.58, 'Diésel ON': 1.45, 'Gas GLP / LPG': 0.95 },
-    MX: { 'Gasolina Pb95': 23.80, 'Diésel ON': 24.50, 'Gas GLP / LPG': 12.80 },
+    PL: { 'Gasolina Pb95': 6.09, 'Diésel ON': 6.15, 'Gas LPG': 2.89 },
+    CO: { 'Gasolina Pb95': 3900, 'Diésel ON': 4100, 'Gas LPG': 2500 },
+    ES: { 'Gasolina Pb95': 1.58, 'Diésel ON': 1.45, 'Gas LPG': 0.95 },
+    MX: { 'Gasolina Pb95': 23.80, 'Diésel ON': 24.50, 'Gas LPG': 12.80 },
   };
 
   const currencySymbols: Record<CountryCode, string> = {
@@ -222,26 +232,31 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     const defaults = defaultPrices[country] || {
       'Gasolina Pb95': 6.09,
       'Diésel ON': 6.15,
-      'Gas GLP / LPG': 2.89,
+      'Gas LPG': 2.89,
     };
     try {
       const storedJson = localStorage.getItem(`litrometrik_fuel_prices_${country}`);
       if (storedJson) {
         const parsed = JSON.parse(storedJson);
+        const lpgVal = typeof parsed['Gas LPG'] === 'number' && parsed['Gas LPG'] > 0
+          ? parsed['Gas LPG']
+          : typeof parsed['Gas GLP / LPG'] === 'number' && parsed['Gas GLP / LPG'] > 0
+          ? parsed['Gas GLP / LPG']
+          : defaults['Gas LPG'];
         return {
           'Gasolina Pb95': typeof parsed['Gasolina Pb95'] === 'number' && parsed['Gasolina Pb95'] > 0 ? parsed['Gasolina Pb95'] : defaults['Gasolina Pb95'],
           'Diésel ON': typeof parsed['Diésel ON'] === 'number' && parsed['Diésel ON'] > 0 ? parsed['Diésel ON'] : defaults['Diésel ON'],
-          'Gas GLP / LPG': typeof parsed['Gas GLP / LPG'] === 'number' && parsed['Gas GLP / LPG'] > 0 ? parsed['Gas GLP / LPG'] : defaults['Gas GLP / LPG'],
+          'Gas LPG': lpgVal,
         };
       }
       // Check legacy individual keys
       const g = parseFloat(localStorage.getItem(`fuel_price_${country}_Gasolina Pb95`) || '');
       const d = parseFloat(localStorage.getItem(`fuel_price_${country}_Diésel ON`) || '');
-      const l = parseFloat(localStorage.getItem(`fuel_price_${country}_Gas GLP / LPG`) || '');
+      const l = parseFloat(localStorage.getItem(`fuel_price_${country}_Gas LPG`) || localStorage.getItem(`fuel_price_${country}_Gas GLP / LPG`) || '');
       return {
         'Gasolina Pb95': (!isNaN(g) && g > 0) ? g : defaults['Gasolina Pb95'],
         'Diésel ON': (!isNaN(d) && d > 0) ? d : defaults['Diésel ON'],
-        'Gas GLP / LPG': (!isNaN(l) && l > 0) ? l : defaults['Gas GLP / LPG'],
+        'Gas LPG': (!isNaN(l) && l > 0) ? l : defaults['Gas LPG'],
       };
     } catch (_) {}
     return defaults;
@@ -250,11 +265,14 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const [activeFuel, setActiveFuel] = useState<FuelKey>(() => {
     try {
       const stored = localStorage.getItem('litrometrik_active_fuel');
-      if (stored === 'Gas GLP / LPG' || stored === 'Gasolina Pb95' || stored === 'Diésel ON') {
+      if (stored === 'Gas LPG' || stored === 'Gasolina Pb95' || stored === 'Diésel ON') {
         return stored as FuelKey;
       }
+      if (stored === 'Gas GLP / LPG' || stored === 'GLP') {
+        return 'Gas LPG';
+      }
     } catch (_) {}
-    return 'Gas GLP / LPG';
+    return 'Gas LPG';
   });
 
   const [fuelPrices, setFuelPrices] = useState<Record<FuelKey, number>>(() => {
@@ -2279,36 +2297,6 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </button>
             </div>
 
-            {/* Modelos Populares por País (Acceso Rápido) */}
-            {DATA_PAIS[selectedCountry]?.cars && DATA_PAIS[selectedCountry].cars.length > 0 && (
-              <div className="p-3 rounded-2xl bg-[#080B11] border border-slate-800 space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                  <span>Autos Populares en {currentCountry.label}:</span>
-                  <span className="text-emerald-400 font-bold">{DATA_PAIS[selectedCountry].cars.length} modelos</span>
-                </label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {DATA_PAIS[selectedCountry].cars.slice(0, 4).map((car) => (
-                    <button
-                      key={car.id}
-                      type="button"
-                      onClick={() => {
-                        const targetCategory = UNIFIED_VEHICLE_CATALOG[car.bodyType] || UNIFIED_VEHICLE_CATALOG.sedan;
-                        const matchingEng = targetCategory.engines.find(e => e.displacement.includes(car.displacementL)) || targetCategory.engines[0];
-                        setModalTempVehicleType(car.bodyType);
-                        setModalTempVehicleModelName(`${car.brand} ${car.model}`);
-                        setModalTempEngineName(car.engine);
-                        setModalTempBaseL100(matchingEng.baseL100);
-                      }}
-                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left transition cursor-pointer active:scale-95 text-slate-200"
-                    >
-                      <div className="text-[11px] font-black truncate">{car.brand} {car.model}</div>
-                      <div className="text-[9px] text-sky-400 font-mono truncate">{car.engine}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* 1. Categoría de Vehículo (Gráficas 3D Profesionales Reales) */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
@@ -2351,9 +2339,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
             {/* 2. Motorización Investigada para la categoría */}
             <div className="space-y-1.5 pt-1">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                <span>2. Motor & Cilindrada Investigada</span>
-                <span className="text-[10px] text-sky-400 font-bold">Datos idénticos a Calculadora</span>
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
+                2. Motor & Cilindrada
               </label>
               <div className="space-y-2">
                 {(
