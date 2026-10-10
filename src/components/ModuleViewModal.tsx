@@ -110,6 +110,7 @@ export interface CategoryDetailProps {
   onOpenAuth?: () => void;
   selectedCountry?: SupportedCountry;
   onCountryChange?: (c: SupportedCountry) => void;
+  currentUser?: any;
 }
 
 // Helper to determine collection and category
@@ -531,6 +532,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
   onBackToCategories,
   selectedCountry: initialSelectedCountry,
   onCountryChange,
+  currentUser: propCurrentUser,
 }) => {
   const effectiveModuleKey = moduleKey || 'refuels';
   const handleExit = onBack || onClose || onBackToCategories || (() => {});
@@ -547,11 +549,17 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
   const { collection: collectionName, categoria: categoriaActual } = getCollectionAndCategory(activeModuleState);
 
   // Active User state
-  const [currentUser, setCurrentUser] = useState<any>(() => getStoredActiveUser());
+  const [currentUser, setCurrentUser] = useState<any>(() => propCurrentUser || getStoredActiveUser());
+
+  useEffect(() => {
+    if (propCurrentUser) {
+      setCurrentUser(propCurrentUser);
+    }
+  }, [propCurrentUser]);
 
   useEffect(() => {
     const unsub = subscribeToAuth((user) => {
-      setCurrentUser(user);
+      if (user) setCurrentUser(user);
     });
     return () => unsub();
   }, []);
@@ -601,58 +609,63 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
   const currentCountryData = DATA_PAIS[selectedCountry] || DATA_PAIS.PL;
   const currencySymbol = activeCountryInfo.currency;
 
-  // Load all records with seed fallback
-  const [allRecords, setAllRecords] = useState<AnyRecord[]>(() => {
+  // Unified infallible record loader that reads user, guest, and global keys
+  const getLoadedRecords = (): AnyRecord[] => {
     const collections = ['repostajes', 'mantenimientos', 'neumaticos', 'tramites'];
-    const loaded: AnyRecord[] = [];
+    const recordMap = new Map<string, AnyRecord>();
+    const uid = currentUser?.uid || currentUser?.id || 'guest';
+
     try {
       collections.forEach((col) => {
-        const uid = currentUser ? currentUser.uid : 'guest';
-        const key = `litrometrik_${uid}_${col}`;
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            loaded.push(...parsed);
+        const keysToTry = [
+          `litrometrik_${uid}_${col}`,
+          `litrometrik_${col}`,
+          `litrometrik_guest_${col}`,
+        ];
+        keysToTry.forEach((k) => {
+          const stored = localStorage.getItem(k);
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) {
+                parsed.forEach((r) => {
+                  if (r && r.id && !recordMap.has(r.id)) {
+                    recordMap.set(r.id, r);
+                  }
+                });
+              }
+            } catch (_) {}
           }
-        }
+        });
       });
     } catch (e) {
-      console.error('Error loading all records:', e);
+      console.error('Error loading records:', e);
     }
-    const isRegistered = currentUser && currentUser.uid && currentUser.uid !== 'guest_user' && currentUser.uid !== 'guest';
+
+    const loaded = Array.from(recordMap.values());
+    const isRegistered = uid && uid !== 'guest_user' && uid !== 'guest';
     if (isRegistered) {
       return loaded;
     }
     if (loaded.length === 0) {
       return DEFAULT_SEED_RECORDS;
     }
-    return loaded;
-  });
+    // Also merge seeds for categories that have no records yet
+    DEFAULT_SEED_RECORDS.forEach((seed) => {
+      const hasCat = loaded.some((r) => r.categoria === seed.categoria);
+      if (!hasCat && !recordMap.has(seed.id)) {
+        recordMap.set(seed.id, seed);
+      }
+    });
+    return Array.from(recordMap.values());
+  };
+
+  // Load all records
+  const [allRecords, setAllRecords] = useState<AnyRecord[]>(getLoadedRecords);
 
   // Re-sync all records when storage updates
   const reloadAllRecords = () => {
-    const collections = ['repostajes', 'mantenimientos', 'neumaticos', 'tramites'];
-    const loaded: AnyRecord[] = [];
-    try {
-      collections.forEach((col) => {
-        const uid = currentUser ? currentUser.uid : 'guest';
-        const key = `litrometrik_${uid}_${col}`;
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) loaded.push(...parsed);
-        }
-      });
-    } catch (e) {
-      console.error('Error reloading all records:', e);
-    }
-    const isRegistered = currentUser && currentUser.uid && currentUser.uid !== 'guest_user' && currentUser.uid !== 'guest';
-    if (isRegistered) {
-      setAllRecords(loaded);
-    } else {
-      setAllRecords(loaded.length === 0 ? DEFAULT_SEED_RECORDS : loaded);
-    }
+    setAllRecords(getLoadedRecords());
   };
 
   // Live Firestore & Supabase fetch when user is authenticated
@@ -973,13 +986,15 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
       };
     }
 
-    const uid = currentUser ? currentUser.uid : 'guest';
+    const uid = currentUser?.uid || currentUser?.id || 'guest';
     const key = `litrometrik_${uid}_${collectionName}`;
     try {
       const currentStored = localStorage.getItem(key);
       const list = currentStored ? JSON.parse(currentStored) : [];
       list.unshift(newRecord);
       localStorage.setItem(key, JSON.stringify(list));
+      localStorage.setItem(`litrometrik_${collectionName}`, JSON.stringify(list));
+      localStorage.setItem(`litrometrik_guest_${collectionName}`, JSON.stringify(list));
 
       // Persist to Firestore & Supabase
       if (uid && uid !== 'guest' && uid !== 'guest_user') {
@@ -1014,46 +1029,77 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
       console.error('Error saving record', e);
     }
 
-    // SINCRONIZACIÓN BIDIRECCIONAL: Al registrar un repostaje desde Bitácora
+    // SINCRONIZACIÓN BIDIRECCIONAL COMPLETA: Al registrar un repostaje desde Bitácora
     if (categoriaActual === 'bitacora') {
       try {
         const refuelPrice = Number(refuelPricePerLiter) || 0;
         const refuelLitersNum = Number(refuelLiters) || (refuelPrice > 0 ? (Number(refuelCost) || 0) / refuelPrice : 0);
         const addedCost = Number(refuelCost) || (refuelLitersNum * refuelPrice) || 0;
 
-        // 1. Obtener saldo actual y sumar el nuevo repostaje
+        // Determinar clave de tanque normalizada
+        const targetFuelKey =
+          refuelFuelType === 'Gas LPG' || refuelFuelType === 'LPG' || refuelFuelType.includes('GLP') || refuelFuelType.includes('LPG')
+            ? 'Gas LPG'
+            : refuelFuelType.includes('Diésel') || refuelFuelType.includes('Diesel') || refuelFuelType.includes('ON')
+            ? 'Diésel ON'
+            : 'Gasolina Pb95';
+
+        // 1. Actualizar tanks por país para que los botones de Modo Marcha se sincronicen
+        let nextTankBal = addedCost;
+        try {
+          const tanksRaw = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
+          const tanksMap = tanksRaw ? JSON.parse(tanksRaw) : {};
+          const prevTank = tanksMap[targetFuelKey] || { balance: 0, liters: 0 };
+          const prevBal = Number(prevTank.balance) || 0;
+          nextTankBal = Math.round((prevBal + addedCost) * 100) / 100;
+          const prevLit = Number(prevTank.liters) || 0;
+          const nextTankLit = Math.round((prevLit + refuelLitersNum) * 100) / 100;
+
+          tanksMap[targetFuelKey] = {
+            ...prevTank,
+            balance: nextTankBal,
+            liters: nextTankLit,
+            lastRefuelAmount: addedCost,
+            lastRefuelPrice: refuelPrice,
+            lastRefuelDate: new Date().toISOString(),
+          };
+          localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(tanksMap));
+          localStorage.setItem('litrometrik_base_fuel_balance_pln', nextTankBal.toString());
+        } catch (_) {}
+
+        // 2. Guardar último tanqueo para el aviso de Saldo Restante
+        localStorage.setItem('litrometrik_ultimo_tanqueo', JSON.stringify(newRecord));
+        localStorage.setItem('litrometrik_active_fuel', targetFuelKey);
+
+        // 3. Obtener saldo actual global y sumar el nuevo repostaje
         const currentBalanceStr = localStorage.getItem('litrometrik_fuel_balance_pln') ||
                                   localStorage.getItem('fuel_balance_pln') ||
                                   localStorage.getItem('currentFuelBalancePLN') || '0';
         const currentBalance = parseFloat(currentBalanceStr) || 0;
         const updatedBalance = Math.round((currentBalance + addedCost) * 100) / 100;
 
-        // 2. Guardar nuevo saldo en todas las claves del sistema
         localStorage.setItem('litrometrik_fuel_balance_pln', updatedBalance.toString());
         localStorage.setItem('fuel_balance_pln', updatedBalance.toString());
         localStorage.setItem('currentFuelBalancePLN', updatedBalance.toString());
 
-        // 3. Actualizar precio de combustible y tipo activo
+        // 4. Actualizar precio de combustible
         if (refuelPrice > 0) {
           localStorage.setItem('fuel_price_per_liter', refuelPrice.toString());
           try {
             const storedPrices = localStorage.getItem('litrometrik_custom_fuel_prices');
             const pricesMap = storedPrices ? JSON.parse(storedPrices) : {};
-            pricesMap[refuelFuelType] = refuelPrice;
+            pricesMap[targetFuelKey] = refuelPrice;
             localStorage.setItem('litrometrik_custom_fuel_prices', JSON.stringify(pricesMap));
           } catch (_) {}
         }
-        localStorage.setItem('litrometrik_active_fuel_type', refuelFuelType);
-        localStorage.setItem('fuel_active_type', refuelFuelType);
-        localStorage.setItem('litrometrik_user_fuel', refuelFuelType);
 
-        // 4. Registrar en el log de recargas de telemetría
+        // 5. Registrar en el log de recargas de telemetría
         const chargeEntry = {
           id: `charge_${Date.now()}`,
           date: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
           timestamp: Date.now(),
           amountPLN: addedCost,
-          fuelType: refuelFuelType,
+          fuelType: targetFuelKey,
           litersEquivalent: refuelLitersNum,
           pricePerLiter: refuelPrice,
           note: `Repostaje en ${refuelStation}`
@@ -1061,15 +1107,15 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
         const savedCharges = JSON.parse(localStorage.getItem('litrometrik_fuel_charges_log') || '[]');
         localStorage.setItem('litrometrik_fuel_charges_log', JSON.stringify([chargeEntry, ...savedCharges]));
 
-        // 5. Emitir eventos globales de sincronización
+        // 6. Emitir eventos globales de sincronización
         window.dispatchEvent(new Event('fuel-storage-updated'));
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new CustomEvent('litrometrik-records-updated'));
         window.dispatchEvent(new CustomEvent('litrometrik-fuel-updated', {
           detail: {
-            balance: updatedBalance,
+            balance: nextTankBal,
             price: refuelPrice,
-            fuelType: refuelFuelType,
+            fuelType: targetFuelKey,
             liters: refuelLitersNum,
             addedCost: addedCost,
           }

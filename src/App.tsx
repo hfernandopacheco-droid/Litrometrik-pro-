@@ -528,6 +528,7 @@ export default function App() {
           onOpenAuth={() => setIsAuthModalOpen(true)}
           selectedCountry={inputs.country}
           onCountryChange={(c) => handleInputsChange({ country: c })}
+          currentUser={currentUser}
         />
       ) : activeModule === 'stats' ? (
         <FuelStatisticsModal
@@ -581,6 +582,7 @@ export default function App() {
               onOpenAuth={() => setIsAuthModalOpen(true)}
               selectedCountry={inputs.country}
               onCountryChange={(c) => handleInputsChange({ country: c })}
+              currentUser={currentUser}
             />
           </div>
 

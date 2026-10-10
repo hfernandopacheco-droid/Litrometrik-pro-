@@ -1190,8 +1190,8 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
           MODAL FLOTANTE / VENTANA DEDICADA DE SELECCIÓN DE MOTOR
          ========================================================================= */}
       {isEngineModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-[#0E131F] border border-slate-800 rounded-t-[32px] sm:rounded-3xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-250">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-[#0E131F] border border-slate-800 rounded-3xl shadow-2xl h-[82dvh] max-h-[600px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header Fijo */}
             <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#0E131F]">
               <div className="flex items-center space-x-2.5">
@@ -1216,8 +1216,8 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
               </button>
             </div>
 
-            {/* Cuerpo con Scroll Suave e Independiente */}
-            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
+            {/* Cuerpo con Scroll Suave e Independiente (con min-h-0 para mantener fijo el footer) */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
               {/* Showcase Hero Card with Professional Vehicle Render */}
               <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-[#121829] border border-slate-800 flex items-center justify-between">
                 <div className="space-y-1">

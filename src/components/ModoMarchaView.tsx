@@ -1356,8 +1356,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     // 2. Guardar en el tanque correspondiente a ese combustible en fuelTanks
     setFuelTanks((prev) => {
       const prevTank = prev[targetFuelKey] || { balance: 0, liters: 0 };
-      const nextBal = Math.round((prevTank.balance + amount) * 100) / 100;
-      const nextLit = Math.round(((prevTank.liters || (finalPrice > 0 ? prevTank.balance / finalPrice : 0)) + addedLiters) * 100) / 100;
+      const prevBal = Number(prevTank.balance) || 0;
+      const nextBal = Math.round((prevBal + amount) * 100) / 100;
+      const prevLit = Number(prevTank.liters) || (finalPrice > 0 ? prevBal / finalPrice : 0);
+      const nextLit = Math.round((prevLit + addedLiters) * 100) / 100;
       const nextMap: FuelTankMap = {
         ...prev,
         [targetFuelKey]: {
@@ -1424,6 +1426,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       refuels.unshift(newRefuelEntry);
       localStorage.setItem(repostajesKey, JSON.stringify(refuels));
       localStorage.setItem('litrometrik_repostajes', JSON.stringify(refuels));
+      localStorage.setItem('litrometrik_guest_repostajes', JSON.stringify(refuels));
       localStorage.setItem('litrometrik_ultimo_tanqueo', JSON.stringify(newRefuelEntry));
       setUltimoTanqueo(newRefuelEntry);
 
@@ -1962,32 +1965,13 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   <span>{liveLiters.toFixed(2).replace('.', ',')} L × {(fuelPrices[activeFuel] || fuelPrice || 0).toFixed(2).replace('.', ',')} {currency}/L</span>
                 </div>
 
-                {/* Botón único sincronizado con Saldo Restante para recargar o ver el saldo */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRefuelFuelType(activeFuel);
-                    const p = fuelPrices[activeFuel] || fuelPrice;
-                    setRefuelAmountInput('');
-                    setRefuelPriceInput(p.toFixed(2));
-                    setShowRefuelModal(true);
-                  }}
-                  className="mt-2 w-full py-1.5 px-2.5 rounded-xl bg-[#182030] hover:bg-[#20293D] border border-slate-700/80 text-white flex items-center justify-between text-[10px] font-black transition cursor-pointer active:scale-95 shadow-sm group"
-                  title="Sincronizado con Saldo Restante. Toca para recargar tanque"
-                >
-                  <div className="flex items-center space-x-1.5 min-w-0">
-                    <span className="text-xs">{activeFuel === 'Gas LPG' ? '🔥' : activeFuel === 'Diésel ON' ? '🛢️' : '⛽'}</span>
-                    <span className="text-amber-300 font-bold truncate">
-                      Tanque {activeFuel === 'Gas LPG' ? 'LPG' : activeFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina'}:
-                    </span>
-                    <span className="font-mono text-white font-black truncate">
-                      {currentFuelBalance.toFixed(1).replace('.', ',')} {currency}
-                    </span>
-                  </div>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[#FF4F00]/20 text-[#FF4F00] border border-[#FF4F00]/40 group-hover:bg-[#FF4F00] group-hover:text-white transition shrink-0 font-black">
-                    + Tanqueo
+                {/* Combustible activo sincronizado directamente con Saldo Restante */}
+                <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
+                  <span className="text-slate-400 font-bold truncate">Combustible activo:</span>
+                  <span className="font-black text-[#FF7A30] truncate flex items-center space-x-1">
+                    <span>{activeFuel === 'Gas LPG' ? '🔥 Gas LPG' : activeFuel === 'Diésel ON' ? '🛢️ Diésel ON' : '⛽ Gasolina Pb95'}</span>
                   </span>
-                </button>
+                </div>
               </div>
             </div>
 
@@ -2272,21 +2256,21 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
           {/* Registro del último tanqueo guardado en la tarjeta principal */}
           {(ultimoTanqueo || fuelTanks[activeFuel]?.lastRefuelAmount) && (
-            <div className="flex items-center justify-between text-[11px] px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-slate-300">
-              <span className="flex items-center space-x-1.5 truncate">
-                <span className="text-emerald-400 font-bold">⛽ Último tanqueo guardado:</span>
-                <span className="font-mono text-white font-black">
-                  +{(ultimoTanqueo?.cost ?? fuelTanks[activeFuel]?.lastRefuelAmount ?? 0).toFixed(2)} {currency}
+            <div className="flex items-center justify-between text-[11px] px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-slate-300 gap-2">
+              <span className="flex items-center space-x-1.5 flex-wrap">
+                <span className="text-emerald-400 font-bold shrink-0">⛽ Último tanqueo guardado:</span>
+                <span className="font-mono text-white font-black shrink-0">
+                  +{(ultimoTanqueo?.cost ?? fuelTanks[activeFuel]?.lastRefuelAmount ?? 0).toFixed(2).replace('.', ',')} {currency}
                 </span>
                 {ultimoTanqueo?.liters && (
-                  <span className="text-emerald-300 text-[10px] font-mono">
-                    ({ultimoTanqueo.liters.toFixed(2)} L)
+                  <span className="text-emerald-300 text-[10px] font-mono shrink-0">
+                    ({ultimoTanqueo.liters.toFixed(1).replace('.', ',')} L)
                   </span>
                 )}
               </span>
-              <span className="text-slate-400 text-[10px] shrink-0 font-bold ml-2">
+              <span className="text-slate-400 text-[10px] shrink-0 font-bold">
                 {(ultimoTanqueo?.pricePerLiter ?? fuelTanks[activeFuel]?.lastRefuelPrice)
-                  ? `@ ${(ultimoTanqueo?.pricePerLiter ?? fuelTanks[activeFuel]?.lastRefuelPrice).toFixed(2)} ${currency}/L`
+                  ? `@ ${(ultimoTanqueo?.pricePerLiter ?? fuelTanks[activeFuel]?.lastRefuelPrice).toFixed(2).replace('.', ',')} ${currency}/L`
                   : ''}
               </span>
             </div>
@@ -2600,7 +2584,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       {/* ---------------- MODAL SELECCIONAR / CALIBRAR VEHÍCULO Y MOTORIZACIÓN INVESTIGADA ---------------- */}
       {showVehicleModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
+          <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl shadow-2xl h-[82dvh] max-h-[580px] flex flex-col overflow-hidden">
             {/* Header Fijo */}
             <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#111622]">
               <div className="flex items-center space-x-2.5">
@@ -2621,8 +2605,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </button>
             </div>
 
-            {/* Cuerpo con Scroll Suave e Independiente */}
-            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
+            {/* Cuerpo con Scroll Suave e Independiente (con min-h-0 para garantizar que el footer permanezca fijo y visible) */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
               {/* 1. Categoría de Vehículo */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
