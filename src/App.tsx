@@ -43,6 +43,7 @@ import {
   clearSupabaseTrips,
   signOutSupabase,
 } from './utils/supabaseClient';
+import { getActiveVehicleState } from './utils/vehicleCatalog';
 
 export default function App() {
   const initialCountry = detectDefaultCountry();
@@ -156,22 +157,46 @@ export default function App() {
     };
   }, []);
 
-  // Inputs state
-  const [inputs, setInputs] = useState<CalculatorInputs>({
-    country: initialCountry,
-    vehicleType: 'sedan',
-    customBaseConsumption: initialCountryData.Sedan.base,
-    transmission: 'manual',
-    fuelType: 'gasolina',
-    routeType: 'mixto',
-    distanceKm: 150,
-    isRoundTrip: false,
-    isACActive: false,
-    coldStartLpg: true,
-    pricePerLiter: initialCountryData.preciosDefecto.gasolina,
-    referenceGasolinePrice: initialCountryData.preciosDefecto.gasolina,
-    routeName: `Viaje Estándar (${initialCountryData.nombre})`,
+  // Inputs state - initialized with saved vehicle preset
+  const [inputs, setInputs] = useState<CalculatorInputs>(() => {
+    const activeV = getActiveVehicleState();
+    return {
+      country: initialCountry,
+      vehicleType: activeV.vehicleType || 'sedan',
+      customBaseConsumption: activeV.baseL100 || initialCountryData.Sedan.base,
+      transmission: activeV.transmission || 'manual',
+      fuelType: 'gasolina',
+      routeType: 'mixto',
+      distanceKm: 150,
+      isRoundTrip: false,
+      isACActive: false,
+      coldStartLpg: true,
+      pricePerLiter: initialCountryData.preciosDefecto.gasolina,
+      referenceGasolinePrice: initialCountryData.preciosDefecto.gasolina,
+      routeName: `Viaje Estándar (${initialCountryData.nombre})`,
+    };
   });
+
+  // Keep vehicle inputs synchronized across Modo Marcha, Calculadora, and Garaje
+  useEffect(() => {
+    const handleVehicleSync = (e: any) => {
+      const v = e?.detail || getActiveVehicleState();
+      if (v) {
+        setInputs((prev) => ({
+          ...prev,
+          vehicleType: v.vehicleType || prev.vehicleType,
+          customBaseConsumption: v.baseL100 || prev.customBaseConsumption,
+          transmission: v.transmission || prev.transmission,
+        }));
+      }
+    };
+    window.addEventListener('litrometrik-vehicle-updated', handleVehicleSync);
+    window.addEventListener('storage', handleVehicleSync);
+    return () => {
+      window.removeEventListener('litrometrik-vehicle-updated', handleVehicleSync);
+      window.removeEventListener('storage', handleVehicleSync);
+    };
+  }, []);
 
   // Saved trips state (restored per user or global cache)
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>(() => {

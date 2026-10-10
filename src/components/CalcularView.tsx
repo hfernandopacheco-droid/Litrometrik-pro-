@@ -132,6 +132,29 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
     return (inputs.customBaseConsumption > 0 ? inputs.customBaseConsumption : currentCatalog.defaultBase).toString();
   });
 
+  // Temporary snapshots to support Cancel in engine modal
+  const [snapshotVehicleKey, setSnapshotVehicleKey] = useState<string>(activeVehicleKey);
+  const [snapshotEngineKey, setSnapshotEngineKey] = useState<string>(selectedEngineKey);
+  const [snapshotBase, setSnapshotBase] = useState<number>(inputs.customBaseConsumption);
+
+  // Global vehicle sync listener (when updated from Modo Marcha or Garaje)
+  useEffect(() => {
+    const handleVehicleSync = (e: any) => {
+      const v = e?.detail || getActiveVehicleState();
+      if (v?.vehicleType) {
+        setModalVehicleKey(v.vehicleType);
+        setSelectedEngineKey(v.engineKey || 'custom');
+        setCustomInputText(v.baseL100?.toString() || '8.0');
+      }
+    };
+    window.addEventListener('litrometrik-vehicle-updated', handleVehicleSync);
+    window.addEventListener('storage', handleVehicleSync);
+    return () => {
+      window.removeEventListener('litrometrik-vehicle-updated', handleVehicleSync);
+      window.removeEventListener('storage', handleVehicleSync);
+    };
+  }, []);
+
   // When vehicle changes from outside or reset, keep state synced
   useEffect(() => {
     const catalog = VEHICLE_CATALOG[inputs.vehicleType] || VEHICLE_CATALOG.sedan;
@@ -176,8 +199,12 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
   ];
   const currentCountry = countries.find((c) => c.code === inputs.country) || countries[0];
 
-  // Handler: Select Vehicle Category Card -> Opens engine selection modal
+  // Handler: Select Vehicle Category Card -> Opens engine selection modal with snapshot
   const handleSelectVehicleCard = (vehicleKey: string) => {
+    setSnapshotVehicleKey(inputs.vehicleType || 'sedan');
+    setSnapshotEngineKey(selectedEngineKey);
+    setSnapshotBase(inputs.customBaseConsumption);
+
     setModalVehicleKey(vehicleKey);
     const catalog = VEHICLE_CATALOG[vehicleKey] || VEHICLE_CATALOG.sedan;
     const defaultEngine = catalog.engines[0];
@@ -187,43 +214,51 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
       : defaultEngine.baseL100;
 
     setSelectedEngineKey(defaultEngine.key);
-
-    onChange({
-      vehicleType: vehicleKey as any,
-      customBaseConsumption: newBase,
-    });
-
+    setCustomInputText(newBase.toString());
     setIsEngineModalOpen(true);
   };
 
-  // Handler: Select Specific Engine under modal vehicle
+  // Handler: Select Specific Engine under modal vehicle (temporary until Save)
   const handleSelectEngine = (engine: UnifiedEngineSpec) => {
     setSelectedEngineKey(engine.key);
-
-    if (modalVehicleKey !== activeVehicleKey) {
-      onChange({ vehicleType: modalVehicleKey as any });
-    }
-
-    if (engine.key.includes('custom') || engine.key === 'custom_direct') {
-      const parsed = parseFloat(customInputText.replace(',', '.'));
-      const finalVal = !isNaN(parsed) && parsed > 0 ? parsed : 8.0;
-      onChange({ customBaseConsumption: finalVal });
-      saveActiveVehicleState({
-        vehicleType: modalVehicleKey as any,
-        engineKey: engine.key,
-        engineName: engine.name,
-        baseL100: finalVal,
-      });
-    } else {
+    if (!engine.key.includes('custom') && engine.key !== 'custom_direct') {
       setCustomInputText(engine.baseL100.toString());
-      onChange({ customBaseConsumption: engine.baseL100 });
-      saveActiveVehicleState({
-        vehicleType: modalVehicleKey as any,
-        engineKey: engine.key,
-        engineName: engine.name,
-        baseL100: engine.baseL100,
-      });
     }
+  };
+
+  // Cancel changes and revert to snapshot
+  const handleCancelEngineModal = () => {
+    setModalVehicleKey(snapshotVehicleKey);
+    setSelectedEngineKey(snapshotEngineKey);
+    setCustomInputText(snapshotBase.toString());
+    setIsEngineModalOpen(false);
+  };
+
+  // Save changes, broadcast event and update calculation
+  const handleSaveEngineModal = () => {
+    const catalog = VEHICLE_CATALOG[modalVehicleKey] || VEHICLE_CATALOG.sedan;
+    const engine = catalog.engines.find((e) => e.key === selectedEngineKey) || catalog.engines[0];
+    let finalBase = engine.baseL100;
+
+    if (modalVehicleKey === 'custom' || selectedEngineKey.includes('custom')) {
+      const parsed = parseFloat(customInputText.replace(',', '.'));
+      finalBase = !isNaN(parsed) && parsed > 0 ? parsed : 8.0;
+    }
+
+    onChange({
+      vehicleType: modalVehicleKey as any,
+      customBaseConsumption: finalBase,
+    });
+
+    saveActiveVehicleState({
+      vehicleType: modalVehicleKey as any,
+      engineKey: engine.key,
+      engineName: engine.name,
+      baseL100: finalBase,
+      vehicleModelName: catalog.label,
+    });
+
+    setIsEngineModalOpen(false);
   };
 
   // Handler: Direct Manual Consumption input change
@@ -1207,7 +1242,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
 
                 <div className="space-y-2">
                   {modalCatalog.engines.map((eng) => {
-                    const isSelected = selectedEngineKey === eng.key && activeVehicleKey === modalVehicleKey;
+                    const isSelected = selectedEngineKey === eng.key;
                     return (
                       <button
                         key={eng.key}
@@ -1297,15 +1332,22 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
               )}
             </div>
 
-            {/* Confirm Button Fijo y Visible */}
-            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#080B11] shrink-0">
+            {/* Action Buttons Footer Fijo y Visible */}
+            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#080B11] shrink-0 flex space-x-2">
               <button
                 type="button"
-                onClick={() => setIsEngineModalOpen(false)}
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#FF4F00] to-[#FF6B00] hover:from-[#FF6B00] hover:to-[#FF8000] text-white font-black text-sm transition active:scale-98 shadow-xl shadow-[#FF4F00]/25 cursor-pointer flex items-center justify-center space-x-2"
+                onClick={handleCancelEngineModal}
+                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEngineModal}
+                className="flex-1 py-3 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] text-white font-black text-xs shadow-lg shadow-[#FF4F00]/25 cursor-pointer active:scale-95 transition flex items-center justify-center space-x-1.5"
               >
                 <Check className="w-4 h-4" />
-                <span>Confirmar Motorización ({calc.activeBaseConsumption.toFixed(1)} L/100km)</span>
+                <span>Guardar Cambios</span>
               </button>
             </div>
           </div>

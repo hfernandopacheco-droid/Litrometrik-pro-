@@ -42,7 +42,7 @@ import {
 } from 'recharts';
 import { CountryCode, DATA_PAIS } from '../utils/countryData';
 import { saveCloudRecord, saveCloudVehicleConfig } from '../utils/firestoreService';
-import { clearSupabaseTrips, signOutSupabase } from '../utils/supabaseClient';
+import { clearSupabaseTrips, signOutSupabase, insertSupabaseRefuel } from '../utils/supabaseClient';
 import { UserAccountModal } from './UserAccountModal';
 import { VehicleType, TransmissionType } from '../types';
 import {
@@ -1326,11 +1326,6 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     // 1. Actualización global del precio para ese tipo de combustible
     updateGlobalFuelPrice(targetFuelKey, finalPrice);
 
-    // Si coincide con el combustible activo del viaje, actualizarlo en vivo
-    if (targetFuelKey === activeFuel) {
-      setFuelPrice(finalPrice);
-    }
-
     const addedLiters = finalPrice > 0 ? Math.round((amount / finalPrice) * 100) / 100 : 0;
 
     // 2. Guardar en el tanque correspondiente a ese combustible en fuelTanks
@@ -1350,18 +1345,31 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       };
       try {
         localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(nextMap));
-        if (targetFuelKey === activeFuel) {
-          localStorage.setItem('litrometrik_base_fuel_balance_pln', nextBal.toString());
-          localStorage.setItem('litrometrik_fuel_balance_pln', Math.max(0, nextBal - liveCost).toFixed(2));
-          localStorage.setItem('fuel_balance_pln', Math.max(0, nextBal - liveCost).toFixed(2));
-          localStorage.setItem('currentFuelBalancePLN', Math.max(0, nextBal - liveCost).toFixed(2));
-        }
+        localStorage.setItem('litrometrik_base_fuel_balance_pln', nextBal.toString());
+        localStorage.setItem('litrometrik_fuel_balance_pln', Math.max(0, nextBal - liveCost).toFixed(2));
+        localStorage.setItem('fuel_balance_pln', Math.max(0, nextBal - liveCost).toFixed(2));
+        localStorage.setItem('currentFuelBalancePLN', Math.max(0, nextBal - liveCost).toFixed(2));
       } catch (_) {}
       return nextMap;
     });
 
+    // 3. Si se repostó otro combustible, activar de inmediato ese combustible para reflejar el saldo en pantalla
+    if (targetFuelKey !== activeFuel) {
+      setActiveFuel(targetFuelKey);
+      activeFuelRef.current = targetFuelKey;
+      setFuelPrice(finalPrice);
+      fuelPriceRef.current = finalPrice;
+      try {
+        localStorage.setItem('litrometrik_active_fuel', targetFuelKey);
+        localStorage.setItem('fuel_price_per_liter', finalPrice.toString());
+      } catch (_) {}
+    } else {
+      setFuelPrice(finalPrice);
+      fuelPriceRef.current = finalPrice;
+    }
+
     try {
-      const uid = currentUser?.uid || 'guest';
+      const uid = currentUser?.uid || currentUser?.id || 'guest';
       const repostajesKey = `litrometrik_${uid}_repostajes`;
       const refuels = JSON.parse(localStorage.getItem(repostajesKey) || '[]');
       const defaultStation =
@@ -1390,9 +1398,21 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       refuels.unshift(newRefuelEntry);
       localStorage.setItem(repostajesKey, JSON.stringify(refuels));
+      localStorage.setItem('litrometrik_repostajes', JSON.stringify(refuels));
+      localStorage.setItem('litrometrik_ultimo_tanqueo', JSON.stringify(newRefuelEntry));
 
       if (uid && uid !== 'guest' && uid !== 'guest_user') {
         saveCloudRecord(uid, 'repostajes', newRefuelEntry);
+        insertSupabaseRefuel(uid, {
+          estacion: defaultStation,
+          litros: addedLiters,
+          precio_por_litro: finalPrice,
+          costo_total: amount,
+          odometro: 145500 + Math.round(distanceKm),
+          combustible: targetFuelKey,
+          notas: `Repostaje ${shortName} desde Modo Marcha`,
+        }).catch((e) => console.warn('Supabase refuel sync notice:', e));
+
         saveCloudVehicleConfig(uid, {
           fuelBalance: Math.max(0, (fuelTanks[targetFuelKey]?.balance || 0) + amount - (targetFuelKey === activeFuel ? liveCost : 0)),
           fuelPricePerLiter: finalPrice,
@@ -1877,7 +1897,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   currentSpeed < 3 ? (
                     <span className="text-[10px] sm:text-[11px] text-amber-400 font-bold flex items-center space-x-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                      <span>Detenido / En Espera ({activeFuel === 'Gas LPG' ? (isACActive ? '1,15' : '0,95') : (isACActive ? '1,00' : '0,80')} L/h)</span>
+                      <span>Detenido ({activeFuel === 'Gas LPG' ? (isACActive ? '1,15' : '0,95') : (isACActive ? '1,00' : '0,80')} L/h)</span>
                     </span>
                   ) : (
                     <span className="text-[10px] sm:text-[11px] text-emerald-400 font-bold flex items-center space-x-1">
@@ -1893,14 +1913,16 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Solo cálculo exacto y botón sincronizado con Saldo Restante */}
+            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Solo cálculo exacto y combustible sincronizado con Saldo Restante */}
             <div className="relative min-h-[142px] sm:min-h-[148px] p-3.5 sm:p-4 rounded-bl-[32px] rounded-br-2xl rounded-tl-2xl rounded-tr-[42px] bg-[#121620]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between overflow-hidden">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase">
                   GASTO EN VIVO
                 </span>
-                <span className="text-[10px] font-mono font-bold text-amber-300">
-                  {fuelPrices[activeFuel]?.toFixed(2)} {currency}/L
+                {/* Tipo de combustible sincronizado con Saldo Restante */}
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-[#FF4F00]/15 border border-[#FF4F00]/30 text-[#FF7A30] flex items-center space-x-1 shrink-0">
+                  <span>{activeFuel === 'Gas LPG' ? '🔥' : activeFuel === 'Diésel ON' ? '🛢️' : '⛽'}</span>
+                  <span>{activeFuel === 'Gas LPG' ? 'Gas LPG' : activeFuel === 'Diésel ON' ? 'Diésel ON' : 'Gasolina Pb95'}</span>
                 </span>
               </div>
 
@@ -1914,7 +1936,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   <span>{liveLiters.toFixed(2).replace('.', ',')} L × {fuelPrices[activeFuel]?.toFixed(2)} {currency}/L</span>
                 </div>
 
-                {/* Botón único sincronizado que aparece por defecto con el combustible seleccionado en Saldo Restante */}
+                {/* Botón único sincronizado con Saldo Restante para recargar o ver el saldo */}
                 <button
                   type="button"
                   onClick={() => {
@@ -1952,10 +1974,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   : 'bg-[#121620]/95 border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700'
               }`}
             >
-              {/* Header con Aire A/C a la izquierda y Switch táctil a la derecha */}
-              <div className="flex items-center justify-between w-full pl-2">
+              {/* Header con aire A/C viento💨 y switch táctil simétrico */}
+              <div className="flex items-center justify-between w-full">
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[10px] sm:text-[11px] font-black tracking-wide uppercase transition-all shadow-sm shrink-0 whitespace-nowrap ${
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl border text-[10px] sm:text-[11px] font-black tracking-tight transition-all shadow-sm shrink-0 whitespace-nowrap ${
                     isACActive
                       ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-cyan-500/20'
                       : 'bg-slate-800/90 border-slate-700/80 text-slate-300'
@@ -1966,7 +1988,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                       isACActive ? 'text-cyan-300 animate-spin' : 'text-slate-400'
                     }`}
                   />
-                  <span className="font-black">Aire A/C</span>
+                  <span>aire A/C viento💨</span>
                 </span>
 
                 {/* Tactile Switch Toggle */}
@@ -2221,6 +2243,19 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </span>
             )}
           </div>
+
+          {/* Registro del último tanqueo guardado para este combustible */}
+          {fuelTanks[activeFuel]?.lastRefuelAmount ? (
+            <div className="flex items-center justify-between text-[11px] px-3 py-1.5 rounded-xl bg-[#141B2A] border border-slate-700/60 text-slate-300">
+              <span className="flex items-center space-x-1.5 truncate">
+                <span className="text-emerald-400 font-bold">⛽ Tanqueo guardado:</span>
+                <span className="font-mono text-white font-black">+{fuelTanks[activeFuel]?.lastRefuelAmount?.toFixed(2)} {currency}</span>
+              </span>
+              <span className="text-slate-400 text-[10px] shrink-0 font-bold ml-2">
+                {fuelTanks[activeFuel]?.lastRefuelPrice ? `@ ${fuelTanks[activeFuel]?.lastRefuelPrice?.toFixed(2)} ${currency}/L` : ''}
+              </span>
+            </div>
+          ) : null}
 
           {/* Big Orange Button: + Registrar Tanqueo */}
           <button
@@ -2693,10 +2728,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               <button
                 type="button"
                 onClick={handleApplyVehicleConfig}
-                className="flex-1 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-md shadow-sky-500/25 cursor-pointer active:scale-95 transition flex items-center justify-center space-x-1"
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black text-xs shadow-md shadow-sky-500/25 cursor-pointer active:scale-95 transition flex items-center justify-center space-x-1.5"
               >
                 <Check className="w-4 h-4" />
-                <span>Aplicar y Sincronizar</span>
+                <span>Guardar Cambios</span>
               </button>
             </div>
           </div>
@@ -2934,8 +2969,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                     Monto pagado ({currency})
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="Ej. 100.00"
                     value={refuelAmountInput}
                     onChange={(e) => setRefuelAmountInput(e.target.value)}
@@ -2949,8 +2984,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                     Precio por litro ({currency}/L)
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={refuelPriceInput}
                     onChange={(e) => setRefuelPriceInput(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-mono font-bold text-base focus:outline-none focus:border-[#FF4F00]"
@@ -2960,7 +2995,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   </span>
                 </div>
 
-                {refuelAmountInput && parseFloat(refuelAmountInput) > 0 && (
+                {refuelAmountInput && parseFloat(refuelAmountInput.replace(',', '.')) > 0 && (
                   <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-400 flex items-center justify-between font-sans">
                     <span>Equivalente:</span>
                     <span>
@@ -2980,15 +3015,19 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowRefuelModal(false)}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 cursor-pointer"
+                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleSaveRefuel}
-                disabled={!refuelAmountInput || parseFloat(refuelAmountInput) <= 0}
-                className="flex-1 py-3 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] disabled:opacity-40 text-white font-black text-xs shadow-md shadow-[#FF4F00]/25 cursor-pointer"
+                disabled={
+                  !refuelAmountInput ||
+                  isNaN(parseFloat(refuelAmountInput.replace(',', '.'))) ||
+                  parseFloat(refuelAmountInput.replace(',', '.')) <= 0
+                }
+                className="flex-1 py-3 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] disabled:opacity-40 text-white font-black text-xs shadow-md shadow-[#FF4F00]/25 cursor-pointer active:scale-95 transition"
               >
                 Guardar Tanqueo
               </button>
