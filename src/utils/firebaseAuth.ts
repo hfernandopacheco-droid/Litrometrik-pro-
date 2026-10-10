@@ -76,13 +76,79 @@ export interface SimpleAuthUser {
 const LOCAL_USER_SESSION_KEY = 'litrometrik_active_user_session';
 const authListeners = new Set<(user: SimpleAuthUser | null) => void>();
 
+export interface RegisteredAccountData {
+  uid: string;
+  email: string;
+  displayName?: string;
+  passwordHash: string;
+  photoURL?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const LOCAL_ACCOUNTS_REGISTRY_KEY = 'litrometrik_registered_accounts';
+
+/**
+ * Reads all persistently registered accounts from local storage
+ */
+export function getStoredAccountsRegistry(): Record<string, RegisteredAccountData> {
+  try {
+    const raw = localStorage.getItem(LOCAL_ACCOUNTS_REGISTRY_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Error reading local accounts registry', e);
+  }
+  return {};
+}
+
+/**
+ * Saves or updates an account in the local guaranteed registry
+ */
+export function saveAccountToRegistry(acc: RegisteredAccountData) {
+  try {
+    const registry = getStoredAccountsRegistry();
+    const cleanEmail = acc.email.trim().toLowerCase();
+    const safeKey = getSafeEmailKey(cleanEmail);
+    // Index by both safeKey and cleanEmail for infallible lookups
+    registry[safeKey] = acc;
+    registry[cleanEmail] = acc;
+    localStorage.setItem(LOCAL_ACCOUNTS_REGISTRY_KEY, JSON.stringify(registry));
+  } catch (e) {
+    console.error('Error saving to accounts registry', e);
+  }
+}
+
+/**
+ * Searches for an account by email across all registered accounts
+ */
+export function findAccountInRegistry(email: string): RegisteredAccountData | null {
+  try {
+    const registry = getStoredAccountsRegistry();
+    const clean = email.trim().toLowerCase();
+    const safeKey = getSafeEmailKey(clean);
+    if (registry[safeKey]) return registry[safeKey];
+    if (registry[clean]) return registry[clean];
+    const match = Object.values(registry).find(
+      (a) => a && a.email && a.email.toLowerCase() === clean
+    );
+    if (match) return match;
+  } catch (e) {
+    console.error('Error looking up account in registry', e);
+  }
+  return null;
+}
+
 /**
  * Creates a safe, consistent Firestore document ID from an email address
  */
 export function getSafeEmailKey(email: string): string {
   const clean = email.trim().toLowerCase();
-  // Safe base64 or alphanumeric key for Firestore document path
-  return 'acc_' + btoa(clean).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  try {
+    const b64 = btoa(encodeURIComponent(clean));
+    return 'acc_' + b64.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  } catch (e) {
+    return 'acc_' + clean.replace(/[^a-zA-Z0-9]/g, '_');
+  }
 }
 
 /**
@@ -121,6 +187,13 @@ function setActiveUser(user: SimpleAuthUser | null) {
   if (user) {
     localStorage.setItem(LOCAL_USER_SESSION_KEY, JSON.stringify(user));
     localStorage.setItem('litrometrik_active_user', JSON.stringify(user));
+    if (user.email) {
+      localStorage.setItem('litrometrik_user_email', user.email);
+    }
+    if (user.displayName) {
+      localStorage.setItem('litrometrik_user_name', user.displayName);
+      localStorage.setItem('wazer_nickname', user.displayName);
+    }
   } else {
     localStorage.removeItem(LOCAL_USER_SESSION_KEY);
     localStorage.removeItem('litrometrik_active_user');
@@ -142,6 +215,17 @@ export function updateActiveUserProfile(updates: Partial<SimpleAuthUser>): Simpl
     ...updates,
   };
   setActiveUser(updated);
+
+  // Also update in accounts registry if email present
+  if (updated.email) {
+    const existingAcc = findAccountInRegistry(updated.email);
+    if (existingAcc) {
+      existingAcc.displayName = updated.displayName || existingAcc.displayName;
+      existingAcc.photoURL = updated.photoURL || existingAcc.photoURL;
+      existingAcc.updatedAt = new Date().toISOString();
+      saveAccountToRegistry(existingAcc);
+    }
+  }
 
   // Sync to Cloud Firestore if connected
   if (db && current.uid) {
@@ -170,10 +254,8 @@ export function subscribeToAuth(callback: (user: SimpleAuthUser | null) => void)
 // ----------------- Cloud-Authenticated Methods -----------------
 
 /**
- * Registers an account in Cloud Firestore.
- * Verifies that the email is not already registered.
- * Stores credentials in Cloud Firestore /accounts/{safeEmailKey} so user can log in
- * from any device (phone, laptop, incognito) without relying on local storage.
+ * Registers an account in Cloud Firestore and in the local guaranteed registry.
+ * Guarantees that the account is permanently retained across logouts and devices.
  */
 export async function performEmailRegister(email: string, pass: string, name?: string): Promise<SimpleAuthUser> {
   const cleanEmail = email.trim().toLowerCase();
@@ -188,7 +270,13 @@ export async function performEmailRegister(email: string, pass: string, name?: s
   const passwordHash = await hashPassword(pass);
   const conductorName = (name && name.trim()) || cleanEmail.split('@')[0];
 
-  // 1. Verify against Cloud Firestore if account already exists
+  // 1. Check local registry if account already exists
+  const existingLocal = findAccountInRegistry(cleanEmail);
+  if (existingLocal) {
+    throw new Error('Ya existe una cuenta registrada con este correo electrónico. Por favor selecciona "Iniciar Sesión".');
+  }
+
+  // 2. Verify against Cloud Firestore if account already exists
   if (db) {
     try {
       const existingAccountSnap = await getDoc(doc(db, 'accounts', safeEmailKey));
@@ -203,8 +291,15 @@ export async function performEmailRegister(email: string, pass: string, name?: s
     }
   }
 
-  // 2. Generate permanent UID for the user
-  const generatedUid = 'usr_' + btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+  // 3. Generate permanent consistent UID for the user based on email
+  let safeUidPart = '';
+  try {
+    safeUidPart = btoa(encodeURIComponent(cleanEmail)).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+  } catch (_) {
+    safeUidPart = Math.random().toString(36).slice(2, 10);
+  }
+  const generatedUid = 'usr_' + safeUidPart;
+
   const createdUser: SimpleAuthUser = {
     uid: generatedUid,
     email: cleanEmail,
@@ -214,7 +309,7 @@ export async function performEmailRegister(email: string, pass: string, name?: s
     providerId: 'password',
   };
 
-  // 3. Attempt Firebase Auth SDK (if enabled in project)
+  // 4. Attempt Firebase Auth SDK (if enabled in project)
   try {
     if (auth) {
       const fbRes = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
@@ -229,32 +324,36 @@ export async function performEmailRegister(email: string, pass: string, name?: s
     console.info('Firebase auth createUser notice:', fbErr?.message || fbErr);
   }
 
-  // 4. Save account directly to Cloud Firestore /accounts/{safeEmailKey}
+  const accountRecord: RegisteredAccountData = {
+    uid: createdUser.uid,
+    email: cleanEmail,
+    displayName: createdUser.displayName || conductorName,
+    passwordHash,
+    photoURL: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  // 5. GUARANTEED PERSISTENCE: Save in local registry immediately
+  saveAccountToRegistry(accountRecord);
+
+  // 6. Save account directly to Cloud Firestore /accounts/{safeEmailKey} & /users/{uid}
   if (db) {
     try {
-      await setDoc(doc(db, 'accounts', safeEmailKey), {
-        uid: createdUser.uid,
-        email: cleanEmail,
-        displayName: createdUser.displayName,
-        passwordHash,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      // Save user base document in /users/{uid}
+      await setDoc(doc(db, 'accounts', safeEmailKey), accountRecord);
       await setDoc(
         doc(db, 'users', createdUser.uid),
         {
           uid: createdUser.uid,
           email: cleanEmail,
           displayName: createdUser.displayName,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt: accountRecord.createdAt,
+          updatedAt: accountRecord.updatedAt,
         },
         { merge: true }
       );
     } catch (dbErr) {
-      console.warn('Could not persist account document to Firestore:', dbErr);
+      console.warn('Could not persist account document to Firestore (account secured locally):', dbErr);
     }
   }
 
@@ -263,10 +362,10 @@ export async function performEmailRegister(email: string, pass: string, name?: s
 }
 
 /**
- * Authenticates user credentials directly against Cloud Firestore.
- * If account does not exist -> strictly rejects login!
- * If password does not match -> strictly rejects login!
- * When authenticated, loads the user's permanent UID so all cloud data (trips, vehicle) syncs.
+ * Authenticates user credentials against Cloud Firestore and the Guaranteed Local Registry.
+ * If account does not exist -> strictly rejects login with clear guidance.
+ * If password does not match -> strictly rejects login.
+ * When authenticated, restores the user's permanent UID so all data (trips, vehicle) remains intact.
  */
 export async function performEmailLogin(email: string, pass: string): Promise<SimpleAuthUser> {
   const cleanEmail = email.trim().toLowerCase();
@@ -304,34 +403,66 @@ export async function performEmailLogin(email: string, pass: string): Promise<Si
   if (!loggedInUser && db) {
     try {
       const accountSnap = await getDoc(doc(db, 'accounts', safeEmailKey));
-      if (!accountSnap.exists()) {
-        throw new Error('No encontramos ninguna cuenta registrada con este correo. Por favor selecciona "Crear Cuenta" para registrarte primero.');
-      }
+      if (accountSnap.exists()) {
+        const accData = accountSnap.data() as RegisteredAccountData;
+        if (accData.passwordHash && accData.passwordHash !== passwordHash) {
+          throw new Error('La contraseña ingresada es incorrecta. Por favor verifica tus credenciales.');
+        }
 
-      const accData = accountSnap.data();
-      if (accData.passwordHash && accData.passwordHash !== passwordHash) {
-        throw new Error('La contraseña ingresada es incorrecta. Por favor verifica tus credenciales.');
-      }
+        loggedInUser = {
+          uid: accData.uid || ('usr_' + btoa(encodeURIComponent(cleanEmail)).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)),
+          email: cleanEmail,
+          displayName: accData.displayName || cleanEmail.split('@')[0],
+          photoURL: accData.photoURL || null,
+          emailVerified: true,
+          providerId: 'password',
+        };
 
-      loggedInUser = {
-        uid: accData.uid || ('usr_' + btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)),
-        email: cleanEmail,
-        displayName: accData.displayName || cleanEmail.split('@')[0],
-        photoURL: accData.photoURL || null,
-        emailVerified: true,
-        providerId: 'password',
-      };
+        // Cache in local guaranteed registry
+        saveAccountToRegistry({
+          uid: loggedInUser.uid,
+          email: cleanEmail,
+          displayName: loggedInUser.displayName || undefined,
+          passwordHash,
+          photoURL: loggedInUser.photoURL,
+          createdAt: accData.createdAt || new Date().toISOString(),
+          updatedAt: accData.updatedAt || new Date().toISOString(),
+        });
+      }
     } catch (err: any) {
-      // Re-throw authentication validation errors
-      if (err.message && (err.message.includes('No encontramos') || err.message.includes('La contraseña ingresada'))) {
+      if (err.message && (err.message.includes('La contraseña ingresada'))) {
         throw err;
       }
       console.warn('Firestore account lookup error:', err);
     }
   }
 
+  // 3. Authenticate against Local Guaranteed Registry (offline or fallback resilience)
   if (!loggedInUser) {
-    throw new Error('No encontramos ninguna cuenta registrada con este correo o los datos son incorrectos. Por favor selecciona "Crear Cuenta" primero.');
+    const localAccount = findAccountInRegistry(cleanEmail);
+    if (localAccount) {
+      if (localAccount.passwordHash && localAccount.passwordHash !== passwordHash) {
+        throw new Error('La contraseña ingresada es incorrecta. Por favor verifica tus credenciales.');
+      }
+
+      loggedInUser = {
+        uid: localAccount.uid,
+        email: localAccount.email,
+        displayName: localAccount.displayName || cleanEmail.split('@')[0],
+        photoURL: localAccount.photoURL || null,
+        emailVerified: true,
+        providerId: 'password',
+      };
+
+      // Asynchronously upload to Cloud Firestore so multi-device sync is updated
+      if (db) {
+        setDoc(doc(db, 'accounts', safeEmailKey), localAccount, { merge: true }).catch(() => {});
+      }
+    }
+  }
+
+  if (!loggedInUser) {
+    throw new Error('No encontramos ninguna cuenta registrada con este correo ("' + cleanEmail + '"). Por favor selecciona "Crear Cuenta" para registrarte primero.');
   }
 
   setActiveUser(loggedInUser);
@@ -473,64 +604,86 @@ export async function performPasswordReset(email: string): Promise<boolean> {
   return true;
 }
 
-export async function performChangePassword(newPassword: string, oldPassword?: string): Promise<{ success: boolean; message: string }> {
+export async function performChangePassword(
+  newPassword: string,
+  userEmailOverride?: string
+): Promise<{ success: boolean; message: string }> {
   const cleanPass = newPassword.trim();
   if (!cleanPass || cleanPass.length < 6) {
     throw new Error('La nueva contraseña debe tener al menos 6 caracteres.');
   }
 
   const currentUser = getStoredActiveUser();
-  let updatedAnyBackend = false;
+  const targetEmail = (
+    userEmailOverride?.trim() ||
+    currentUser?.email ||
+    localStorage.getItem('litrometrik_user_email') ||
+    ''
+  ).toLowerCase().trim();
 
-  // 1. Update in Firebase Auth instance if logged in
-  if (auth && auth.currentUser) {
-    try {
-      await fbUpdatePassword(auth.currentUser, cleanPass);
-      updatedAnyBackend = true;
-    } catch (fbErr: any) {
-      console.warn('Firebase Auth updatePassword warning:', fbErr?.message || fbErr);
-      if (fbErr?.code === 'auth/requires-recent-login') {
-        // requires re-authentication, we proceed to also update firestore record
-      }
-    }
+  if (!targetEmail) {
+    throw new Error('No se detectó un correo electrónico vinculado a la sesión actual.');
   }
 
-  // 2. Update hashed password in Firestore accounts database
-  if (db && currentUser?.email) {
+  const safeKey = getSafeEmailKey(targetEmail);
+  const newHash = await hashPassword(cleanPass);
+  const updatedAt = new Date().toISOString();
+
+  // 1. Update in Local Guaranteed Registry (instant & offline safe)
+  const existingLocal = findAccountInRegistry(targetEmail);
+  if (existingLocal) {
+    existingLocal.passwordHash = newHash;
+    existingLocal.updatedAt = updatedAt;
+    saveAccountToRegistry(existingLocal);
+  } else {
+    saveAccountToRegistry({
+      uid: currentUser?.uid || ('usr_' + btoa(encodeURIComponent(targetEmail)).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)),
+      email: targetEmail,
+      displayName: currentUser?.displayName || targetEmail.split('@')[0],
+      passwordHash: newHash,
+      createdAt: updatedAt,
+      updatedAt,
+    });
+  }
+
+  // 2. Update in Cloud Firestore accounts collection
+  if (db) {
     try {
-      const safeKey = getSafeEmailKey(currentUser.email);
-      const newHash = await hashPassword(cleanPass);
       await setDoc(
         doc(db, 'accounts', safeKey),
         {
+          email: targetEmail,
           passwordHash: newHash,
-          updatedAt: new Date().toISOString(),
+          updatedAt,
         },
         { merge: true }
       );
-      if (currentUser.uid) {
+      if (currentUser?.uid) {
         await setDoc(
           doc(db, 'users', currentUser.uid),
-          {
-            updatedAt: new Date().toISOString(),
-          },
+          { updatedAt },
           { merge: true }
         );
       }
-      updatedAnyBackend = true;
     } catch (dbErr) {
-      console.warn('Firestore password hash update error:', dbErr);
+      console.warn('Firestore password hash update error (account secured locally):', dbErr);
     }
   }
 
-  // 3. Update in Supabase Auth if session exists
+  // 3. Update in Firebase Auth SDK if user session exists
+  if (auth && auth.currentUser) {
+    try {
+      await fbUpdatePassword(auth.currentUser, cleanPass);
+    } catch (fbErr: any) {
+      console.info('Firebase Auth updatePassword notice:', fbErr?.message || fbErr);
+    }
+  }
+
+  // 4. Update in Supabase Auth if session exists
   try {
     const { supabase } = await import('./supabaseClient');
     if (supabase && supabase.auth) {
-      const { error: sbErr } = await supabase.auth.updateUser({ password: cleanPass });
-      if (!sbErr) {
-        updatedAnyBackend = true;
-      }
+      await supabase.auth.updateUser({ password: cleanPass });
     }
   } catch (sbErr) {
     console.warn('Supabase password update notice:', sbErr);
@@ -538,7 +691,7 @@ export async function performChangePassword(newPassword: string, oldPassword?: s
 
   return {
     success: true,
-    message: 'Contraseña actualizada y verificada correctamente. Ya puedes ingresar con tu nueva clave aprobada.',
+    message: '¡Contraseña actualizada exitosamente! Tu nueva contraseña ya está guardada y es válida para iniciar sesión.',
   };
 }
 

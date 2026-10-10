@@ -165,9 +165,14 @@ export default function App() {
     routeName: `Viaje Estándar (${initialCountryData.nombre})`,
   });
 
-  // Saved trips state
+  // Saved trips state (restored per user or global cache)
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>(() => {
     try {
+      const activeU = getStoredActiveUser();
+      if (activeU?.uid) {
+        const userTrips = localStorage.getItem(`fuel_trips_pln_${activeU.uid}`);
+        if (userTrips) return JSON.parse(userTrips);
+      }
       const stored = localStorage.getItem('fuel_trips_pln');
       if (stored) {
         return JSON.parse(stored);
@@ -182,9 +187,34 @@ export default function App() {
   useEffect(() => {
     if (!currentUser?.uid || currentUser.uid === 'guest' || currentUser.uid === 'guest_user') return;
     
-    // Immediate initial fetch of saved trips
-    fetchCloudRecords(currentUser.uid, 'viajes').then((trips) => {
-      setSavedTrips(trips || []);
+    // 1. Instant recovery from local user-scoped cache
+    try {
+      const userLocalTripsRaw = localStorage.getItem(`fuel_trips_pln_${currentUser.uid}`);
+      if (userLocalTripsRaw) {
+        const parsed = JSON.parse(userLocalTripsRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSavedTrips(parsed);
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fetch from Cloud Firestore and merge safely
+    fetchCloudRecords(currentUser.uid, 'viajes').then((cloudTrips) => {
+      if (cloudTrips && cloudTrips.length > 0) {
+        setSavedTrips((prev) => {
+          const map = new Map<string, SavedTrip>();
+          cloudTrips.forEach((t) => map.set(t.id, t));
+          prev.forEach((t) => {
+            if (!map.has(t.id)) map.set(t.id, t);
+          });
+          const merged = Array.from(map.values());
+          try {
+            localStorage.setItem(`fuel_trips_pln_${currentUser.uid}`, JSON.stringify(merged));
+            localStorage.setItem('fuel_trips_pln', JSON.stringify(merged));
+          } catch (_) {}
+          return merged;
+        });
+      }
     });
 
     // Sync vehicle config and fuel balance from cloud
@@ -198,12 +228,18 @@ export default function App() {
     });
 
     const unsub = subscribeToCloudCollection(currentUser.uid, 'viajes', (cloudTrips) => {
-      setSavedTrips(cloudTrips || []);
+      if (cloudTrips && cloudTrips.length > 0) {
+        setSavedTrips(cloudTrips);
+        try {
+          localStorage.setItem(`fuel_trips_pln_${currentUser.uid}`, JSON.stringify(cloudTrips));
+          localStorage.setItem('fuel_trips_pln', JSON.stringify(cloudTrips));
+        } catch (_) {}
+      }
     });
     return () => {
       unsub && unsub();
     };
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   // Modals & View state
   const [currentTab, setCurrentTab] = useState<MainAppTab>('marcha');
@@ -220,14 +256,21 @@ export default function App() {
     return () => window.removeEventListener('gmp-quota-exceeded', handleQuota);
   }, []);
 
-  // Save trips to localStorage backup whenever they change
+  // Save trips safely without wiping on user logout
   useEffect(() => {
     try {
-      localStorage.setItem('fuel_trips_pln', JSON.stringify(savedTrips));
+      if (currentUser?.uid && currentUser.uid !== 'guest' && currentUser.uid !== 'guest_user') {
+        localStorage.setItem(`fuel_trips_pln_${currentUser.uid}`, JSON.stringify(savedTrips));
+        if (savedTrips.length > 0) {
+          localStorage.setItem('fuel_trips_pln', JSON.stringify(savedTrips));
+        }
+      } else if (savedTrips.length > 0) {
+        localStorage.setItem('fuel_trips_pln', JSON.stringify(savedTrips));
+      }
     } catch (e) {
       console.error('Error saving trips', e);
     }
-  }, [savedTrips]);
+  }, [savedTrips, currentUser?.uid]);
 
   // Synchronize country change across all tabs in real-time
   useEffect(() => {

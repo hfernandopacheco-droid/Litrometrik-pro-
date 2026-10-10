@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   X, ArrowLeft, User, Award, Shield, Volume2, AlertTriangle, Fuel,
   Check, Sparkles, MapPin, Shuffle, Camera, Upload, Trash2, Car,
-  Globe, Gauge, CheckCircle2
+  Globe, Gauge, CheckCircle2, Lock, Key, Eye, EyeOff, ShieldCheck, AlertCircle
 } from 'lucide-react';
 import { DATA_PAIS, CountryCode, CarModelSpec } from '../utils/countryData';
-import { getStoredActiveUser, updateActiveUserProfile } from '../utils/firebaseAuth';
+import { getStoredActiveUser, updateActiveUserProfile, performChangePassword } from '../utils/firebaseAuth';
 import { saveActiveVehicleState } from '../utils/vehicleCatalog';
 
 interface UserWazerProfileModalProps {
@@ -44,6 +44,46 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
   const [avoidTolls, setAvoidTolls] = useState(false);
   const [geofenceGas, setGeofenceGas] = useState(true);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Password Change State
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (newPassword.length < 6) {
+      setPasswordError('La nueva contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Las contraseñas no coinciden. Por favor verifícalas.');
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const res = await performChangePassword(newPassword, activeUser?.email || undefined);
+      setPasswordSuccess(res.message);
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        setPasswordSuccess(null);
+      }, 5000);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Error al actualizar la contraseña.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -486,6 +526,109 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
               </select>
             </div>
           </div>
+        </div>
+
+        {/* 5. SEGURIDAD & CONTRASEÑA */}
+        <div
+          className="p-5 rounded-3xl space-y-4"
+          style={{
+            backgroundColor: '#0F0F17',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-xl bg-violet-600/30 border border-violet-500/40 flex items-center justify-center text-violet-400">
+                <Key className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-white">Seguridad & Contraseña</h4>
+                <p className="text-[11px] text-slate-400">Cambiar clave de acceso para iniciar sesión</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              Sincronizado
+            </span>
+          </div>
+
+          <form onSubmit={handleChangePassword} className="space-y-3 pt-1">
+            {passwordError && (
+              <div className="p-3 rounded-2xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs font-bold flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            {passwordSuccess && (
+              <div className="p-3 rounded-2xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-xs font-bold flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{passwordSuccess}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Nueva Contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPass ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full pl-3 pr-10 py-2.5 rounded-2xl text-white text-xs font-medium focus:outline-none focus:border-violet-500 transition"
+                    style={{
+                      backgroundColor: '#14141F',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPass(!showNewPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    {showNewPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Confirmar Contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPass ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repite la contraseña"
+                    className="w-full pl-3 pr-10 py-2.5 rounded-2xl text-white text-xs font-medium focus:outline-none focus:border-violet-500 transition"
+                    style={{
+                      backgroundColor: '#14141F',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPass(!showConfirmPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    {showConfirmPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={passwordLoading || !newPassword}
+              className="w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-bold text-xs shadow-md transition flex items-center justify-center space-x-2 cursor-pointer mt-1"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>{passwordLoading ? 'Actualizando contraseña...' : 'Actualizar y Guardar Nueva Contraseña'}</span>
+            </button>
+          </form>
         </div>
 
         {/* Success Toast */}

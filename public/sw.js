@@ -44,14 +44,26 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch handler: Network-first for code & API, fallback to cache for offline resilience
+// Fetch handler: Network-first for app shell, pass-through for APIs & database
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+  // Only handle GET requests with http/https schemes
+  if (event.request.method !== 'GET') return;
 
-  // Always bypass cache for API routes, live tiles and routes
+  let url;
+  try {
+    url = new URL(event.request.url);
+  } catch (_) {
+    return;
+  }
+
+  // Always bypass cache for APIs, cloud database, map tiles and external resources
   if (
     url.pathname.startsWith('/api/') ||
     url.pathname.includes('/route/') ||
+    url.hostname.includes('googleapis') ||
+    url.hostname.includes('firebase') ||
+    url.hostname.includes('supabase') ||
+    url.hostname.includes('identitytoolkit') ||
     url.hostname.includes('google') ||
     url.hostname.includes('openstreetmap') ||
     url.hostname.includes('cartocdn') ||
@@ -68,13 +80,16 @@ self.addEventListener('fetch', (event) => {
           networkResponse &&
           networkResponse.status === 200 &&
           event.request.method === 'GET' &&
+          (url.protocol === 'http:' || url.protocol === 'https:') &&
           !url.pathname.endsWith('.ts') &&
           !url.pathname.endsWith('.tsx')
         ) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
+          try {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone).catch(() => {});
+            });
+          } catch (_) {}
         }
         return networkResponse;
       })

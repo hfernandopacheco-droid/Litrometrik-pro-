@@ -2,19 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <script>
-      try {
-        const originalFetch = window.fetch;
-        if (originalFetch) {
-          Object.defineProperty(window, 'fetch', {
-            get: function() { return originalFetch; },
-            set: function(v) { /* prevent polyfill overwrite crash */ },
-            configurable: true,
-            enumerable: true
-          });
-        }
-      } catch (e) {}
-    </script>
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#080B11">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
@@ -48,32 +36,16 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Service Worker Registration and Safe Single Reload Controller Handler
+      // Service Worker Registration for PWA without reload flaps
       if ('serviceWorker' in navigator) {
-        let refreshing = false;
-
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            refreshing = true;
-            console.log('[SW] Controller changed. Reloading page once...');
-            window.location.reload();
-          }
-        });
-
-        // Register Service Worker only ONCE when window loads
         window.addEventListener('load', () => {
           navigator.serviceWorker
             .register('/sw.js', { scope: '/' })
             .then((registration) => {
               console.log('[SW] Registered successfully with scope:', registration.scope);
-
-              // Periodic update check every 60 seconds
-              setInterval(() => {
-                registration.update().catch(() => {});
-              }, 60000);
             })
             .catch((err) => {
-              console.warn('[SW] Registration failed:', err);
+              console.warn('[SW] Registration note:', err);
             });
         });
       }

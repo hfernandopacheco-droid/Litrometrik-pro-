@@ -8,6 +8,8 @@ import {
   performEmailLogin,
   performPasswordReset,
   getStoredActiveUser,
+  hashPassword,
+  saveAccountToRegistry
 } from '../utils/firebaseAuth';
 import {
   signUpWithSupabase,
@@ -152,12 +154,22 @@ export const AuthGate: React.FC<AuthGateProps> = ({
 
         // Fallback user session if network was strictly offline
         if (!createdUser) {
+          const cleanEmail = email.trim().toLowerCase();
+          const pHash = await hashPassword(password);
           const fallbackUser = {
-            uid: 'usr_' + Date.now().toString(36),
-            id: 'usr_' + Date.now().toString(36),
-            email: email.trim().toLowerCase(),
-            displayName: name.trim() || email.split('@')[0],
+            uid: 'usr_' + btoa(encodeURIComponent(cleanEmail)).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16),
+            id: 'usr_' + btoa(encodeURIComponent(cleanEmail)).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16),
+            email: cleanEmail,
+            displayName: name.trim() || cleanEmail.split('@')[0],
           };
+          saveAccountToRegistry({
+            uid: fallbackUser.uid,
+            email: cleanEmail,
+            displayName: fallbackUser.displayName,
+            passwordHash: pHash,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
           createdUser = fallbackUser;
         }
 

@@ -14,7 +14,8 @@ import {
   performSignOut,
   requestNotificationPermission,
   getStoredActiveUser,
-  updateActiveUserProfile
+  updateActiveUserProfile,
+  performChangePassword
 } from '../utils/firebaseAuth';
 import { DATA_PAIS, CountryCode } from '../utils/countryData';
 
@@ -59,6 +60,44 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [editEngineSize, setEditEngineSize] = useState('1.6');
   const [editFuelType, setEditFuelType] = useState('LPG');
   const [editSavedToast, setEditSavedToast] = useState(false);
+
+  // Password change state
+  const [profileNewPass, setProfileNewPass] = useState('');
+  const [profileConfirmPass, setProfileConfirmPass] = useState('');
+  const [showProfileNewPass, setShowProfileNewPass] = useState(false);
+  const [showProfileConfirmPass, setShowProfileConfirmPass] = useState(false);
+  const [profilePassLoading, setProfilePassLoading] = useState(false);
+  const [profilePassError, setProfilePassError] = useState<string | null>(null);
+  const [profilePassSuccess, setProfilePassSuccess] = useState<string | null>(null);
+
+  const handleProfileChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfilePassError(null);
+    setProfilePassSuccess(null);
+
+    if (profileNewPass.length < 6) {
+      setProfilePassError('La nueva contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    if (profileNewPass !== profileConfirmPass) {
+      setProfilePassError('Las contraseñas no coinciden. Por favor verifícalas.');
+      return;
+    }
+
+    setProfilePassLoading(true);
+    try {
+      const res = await performChangePassword(profileNewPass, editEmail || activeUser?.email || undefined);
+      setProfilePassSuccess(res.message);
+      setProfileNewPass('');
+      setProfileConfirmPass('');
+      setTimeout(() => setProfilePassSuccess(null), 5000);
+    } catch (err: any) {
+      setProfilePassError(err.message || 'Error al actualizar la contraseña.');
+    } finally {
+      setProfilePassLoading(false);
+    }
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -553,6 +592,89 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </select>
                 </div>
               </div>
+            </div>
+
+            {/* Password Change Section */}
+            <div className="p-4 rounded-2xl bg-[#1e293b] border border-slate-700/60 space-y-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white flex items-center space-x-1.5">
+                  <KeyRound className="w-4 h-4 text-cyan-400" />
+                  <span>Seguridad • Cambiar Contraseña</span>
+                </span>
+                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  Sincronizado
+                </span>
+              </div>
+
+              {profilePassError && (
+                <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs font-bold flex items-center space-x-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                  <span>{profilePassError}</span>
+                </div>
+              )}
+
+              {profilePassSuccess && (
+                <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-xs font-bold flex items-center space-x-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                  <span>{profilePassSuccess}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Nueva Contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showProfileNewPass ? 'text' : 'password'}
+                      value={profileNewPass}
+                      onChange={(e) => setProfileNewPass(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className="w-full bg-[#0f172a] border border-slate-700 rounded-xl px-3 py-2 pr-9 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileNewPass(!showProfileNewPass)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showProfileNewPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Confirmar Contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showProfileConfirmPass ? 'text' : 'password'}
+                      value={profileConfirmPass}
+                      onChange={(e) => setProfileConfirmPass(e.target.value)}
+                      placeholder="Repite la contraseña"
+                      className="w-full bg-[#0f172a] border border-slate-700 rounded-xl px-3 py-2 pr-9 text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileConfirmPass(!showProfileConfirmPass)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showProfileConfirmPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleProfileChangePassword}
+                disabled={profilePassLoading || !profileNewPass}
+                className="w-full py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition button-hover-pro cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>{profilePassLoading ? 'Actualizando...' : 'Actualizar Contraseña'}</span>
+              </button>
             </div>
 
             {editSavedToast && (
