@@ -1190,8 +1190,8 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
           MODAL FLOTANTE / VENTANA DEDICADA DE SELECCIÓN DE MOTOR
          ========================================================================= */}
       {isEngineModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-[#0E131F] border border-slate-800 rounded-t-[32px] sm:rounded-3xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-250">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-[#0E131F] border border-slate-800 rounded-t-[32px] sm:rounded-3xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-250">
             {/* Modal Header Fijo */}
             <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#0E131F]">
               <div className="flex items-center space-x-2.5">
@@ -1336,18 +1336,18 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
             </div>
 
             {/* Action Buttons Footer Fijo y Visible */}
-            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#080B11] shrink-0 flex space-x-2">
+            <div className="p-4 pb-[max(env(safe-area-inset-bottom,0px),20px)] sm:pb-4 border-t border-slate-800 bg-[#080B11] shrink-0 flex space-x-2.5 z-10">
               <button
                 type="button"
                 onClick={handleCancelEngineModal}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
+                className="flex-1 py-3.5 rounded-2xl bg-slate-800 text-slate-200 hover:text-white font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleSaveEngineModal}
-                className="flex-1 py-3 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] text-white font-black text-xs shadow-lg shadow-[#FF4F00]/25 cursor-pointer active:scale-95 transition flex items-center justify-center space-x-1.5"
+                className="flex-1 py-3.5 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] text-white font-black text-xs shadow-lg shadow-[#FF4F00]/25 cursor-pointer active:scale-95 transition flex items-center justify-center space-x-1.5"
               >
                 <Check className="w-4 h-4" />
                 <span>Guardar Cambios</span>

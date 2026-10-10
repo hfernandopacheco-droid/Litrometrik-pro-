@@ -1847,6 +1847,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               setModalTempEngineName(engineName);
               setModalTempBaseL100(baseConsumptionL100);
               setModalTempTransmission(transmission);
+              setModalTempVehicleModelName(activeVehicleState.vehicleModelName || activeVehiclePreset.label);
               setShowVehicleModal(true);
             }}
             className="flex-1 flex items-center justify-between p-1 rounded-xl hover:bg-white/5 transition active:scale-[0.99] cursor-pointer text-left group"
@@ -2598,8 +2599,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL SELECCIONAR / CALIBRAR VEHÍCULO Y MOTORIZACIÓN INVESTIGADA ---------------- */}
       {showVehicleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
             {/* Header Fijo */}
             <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#111622]">
               <div className="flex items-center space-x-2.5">
@@ -2751,18 +2752,18 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             </div>
 
             {/* Footer Fijo y Permanente (Siempre visible para guardar) */}
-            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2">
+            <div className="p-4 pb-[max(env(safe-area-inset-bottom,0px),16px)] sm:pb-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2.5 z-10">
               <button
                 type="button"
                 onClick={handleCancelVehicleModal}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
+                className="flex-1 py-3.5 rounded-2xl bg-slate-800 text-slate-200 hover:text-white font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleApplyVehicleConfig}
-                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black text-xs shadow-md shadow-sky-500/25 cursor-pointer active:scale-95 transition flex items-center justify-center space-x-1.5"
+                className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black text-xs shadow-lg shadow-sky-500/30 cursor-pointer active:scale-95 transition flex items-center justify-center space-x-1.5"
               >
                 <Check className="w-4 h-4" />
                 <span>Guardar Cambios</span>
@@ -2774,7 +2775,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL LISTA DE COMBUSTIBLES (Imagen 3) ---------------- */}
       {showFuelPickerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#121620]">
               <div className="flex items-center space-x-2">
@@ -2858,7 +2859,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL CONFIRMACIÓN GUARDAR TRAMO AL CAMBIAR COMBUSTIBLE ---------------- */}
       {showSaveSegmentConfirmModal && pendingFuelTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-[#121620] border border-[#FF4F00]/60 rounded-3xl p-5 space-y-4 shadow-2xl">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-2xl bg-[#FF4F00]/20 text-[#FF4F00] flex items-center justify-center shrink-0">
@@ -2940,8 +2941,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL REGISTRAR TANQUEO (UNIFICADO CON SELECTOR SUPERIOR) ---------------- */}
       {showRefuelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             {/* Header Fijo */}
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 shrink-0 bg-[#121620]">
               <h3 className="text-base font-black text-white flex items-center space-x-2">
@@ -3045,11 +3046,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             </div>
 
             {/* Footer Fijo y Visible */}
-            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2">
+            <div className="p-4 pb-[max(env(safe-area-inset-bottom,0px),16px)] sm:pb-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2.5 z-10">
               <button
                 type="button"
                 onClick={() => setShowRefuelModal(false)}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
+                className="flex-1 py-3.5 rounded-2xl bg-slate-800 text-slate-200 hover:text-white font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
               >
                 Cancelar
               </button>
@@ -3061,7 +3062,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   isNaN(parseFloat(refuelAmountInput.replace(',', '.'))) ||
                   parseFloat(refuelAmountInput.replace(',', '.')) <= 0
                 }
-                className="flex-1 py-3 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] disabled:opacity-40 text-white font-black text-xs shadow-md shadow-[#FF4F00]/25 cursor-pointer active:scale-95 transition"
+                className="flex-1 py-3.5 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] disabled:opacity-40 text-white font-black text-xs shadow-md shadow-[#FF4F00]/25 cursor-pointer active:scale-95 transition"
               >
                 Guardar Tanqueo
               </button>
@@ -3072,7 +3073,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL AJUSTAR NIVEL ---------------- */}
       {showAdjustModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
             {/* Header Fijo */}
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 shrink-0 bg-[#121620]">
@@ -3083,7 +3084,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAdjustModal(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3135,20 +3136,20 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             </div>
 
             {/* Footer Fijo y Visible */}
-            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2">
+            <div className="p-4 pb-[max(env(safe-area-inset-bottom,0px),16px)] sm:pb-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2.5 z-10">
               <button
                 type="button"
                 onClick={() => setShowAdjustModal(false)}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700"
+                className="flex-1 py-3.5 rounded-2xl bg-slate-800 text-slate-200 hover:text-white font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleSaveAdjustLevel}
-                className="flex-1 py-3 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] text-white font-black text-xs shadow-md shadow-[#FF4F00]/25"
+                className="flex-1 py-3.5 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] text-white font-black text-xs shadow-md shadow-[#FF4F00]/25 cursor-pointer active:scale-95 transition"
               >
-                Guardar
+                Guardar Nivel
               </button>
             </div>
           </div>
