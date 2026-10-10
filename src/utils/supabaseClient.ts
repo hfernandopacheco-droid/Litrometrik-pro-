@@ -427,20 +427,31 @@ export const signOutSupabase = async () => {
 export const subscribeToSupabaseAuth = (
   callback: (user: User | null, session: Session | null) => void
 ) => {
+  if (!isSupabaseConfigured()) {
+    callback(null, null);
+    return () => {};
+  }
+
   // Initial check
   supabase.auth.getSession().then(({ data: { session } }) => {
     callback(session?.user || null, session || null);
+  }).catch(() => {
+    callback(null, null);
   });
 
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session?.user || null, session || null);
-  });
+  try {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      callback(session?.user || null, session || null);
+    });
 
-  return () => {
-    subscription.unsubscribe();
-  };
+    return () => {
+      subscription?.unsubscribe?.();
+    };
+  } catch (_) {
+    return () => {};
+  }
 };
 
 // ----------------- DATA PERSISTENCE HELPERS -----------------
