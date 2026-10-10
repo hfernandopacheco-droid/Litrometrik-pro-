@@ -587,6 +587,16 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const [adjustBalanceInput, setAdjustBalanceInput] = useState('');
   const [adjustLitersInput, setAdjustLitersInput] = useState('');
 
+  // Último tanqueo guardado reactivo
+  const [ultimoTanqueo, setUltimoTanqueo] = useState<any>(() => {
+    try {
+      const stored = localStorage.getItem('litrometrik_ultimo_tanqueo');
+      return stored ? JSON.parse(stored) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+
   const handleSelectRefuelFuel = (fuel: FuelKey) => {
     setRefuelFuelType(fuel);
     const p = fuelPrices[fuel] || defaultPrices[selectedCountry]?.[fuel] || 6.09;
@@ -732,6 +742,12 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             if (JSON.stringify(prev) === storedTrips) return prev;
             return JSON.parse(storedTrips);
           });
+        }
+        const storedUltimo = localStorage.getItem('litrometrik_ultimo_tanqueo');
+        if (storedUltimo) {
+          try {
+            setUltimoTanqueo(JSON.parse(storedUltimo));
+          } catch (_) {}
         }
       } catch (_) {}
     };
@@ -1292,7 +1308,16 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // ---------------- VEHICLE CALIBRATION APPLY ----------------
+  // ---------------- VEHICLE CALIBRATION APPLY & CANCEL ----------------
+  const handleCancelVehicleModal = () => {
+    setModalTempVehicleType(vehicleType);
+    setModalTempEngineName(engineName);
+    setModalTempBaseL100(baseConsumptionL100);
+    setModalTempTransmission(transmission);
+    setModalTempVehicleModelName(activeVehicleState.vehicleModelName || '');
+    setShowVehicleModal(false);
+  };
+
   const handleApplyVehicleConfig = () => {
     setVehicleType(modalTempVehicleType);
     setEngineName(modalTempEngineName);
@@ -1400,6 +1425,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       localStorage.setItem(repostajesKey, JSON.stringify(refuels));
       localStorage.setItem('litrometrik_repostajes', JSON.stringify(refuels));
       localStorage.setItem('litrometrik_ultimo_tanqueo', JSON.stringify(newRefuelEntry));
+      setUltimoTanqueo(newRefuelEntry);
 
       if (uid && uid !== 'guest' && uid !== 'guest_user') {
         saveCloudRecord(uid, 'repostajes', newRefuelEntry);
@@ -1919,10 +1945,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase">
                   GASTO EN VIVO
                 </span>
-                {/* Tipo de combustible sincronizado con Saldo Restante */}
+                {/* Insignia distintiva con el combustible exacto activo */}
                 <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-[#FF4F00]/15 border border-[#FF4F00]/30 text-[#FF7A30] flex items-center space-x-1 shrink-0">
-                  <span>{activeFuel === 'Gas LPG' ? '🔥' : activeFuel === 'Diésel ON' ? '🛢️' : '⛽'}</span>
-                  <span>{activeFuel === 'Gas LPG' ? 'Gas LPG' : activeFuel === 'Diésel ON' ? 'Diésel ON' : 'Gasolina Pb95'}</span>
+                  <span>{activeFuel === 'Gas LPG' ? '🔥 Gas LPG' : activeFuel === 'Diésel ON' ? '🛢️ Diésel ON' : '⛽ Gasolina Pb95'}</span>
                 </span>
               </div>
 
@@ -1931,9 +1956,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   {liveCost.toFixed(2).replace('.', ',')} <span className="text-xs font-bold">{currency}</span>
                 </div>
 
-                {/* Explicación transparente del cálculo matemático */}
+                {/* Fórmula transparente del costo en vivo en tiempo real (L gastados × Precio/L) */}
                 <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                  <span>{liveLiters.toFixed(2).replace('.', ',')} L × {fuelPrices[activeFuel]?.toFixed(2)} {currency}/L</span>
+                  <span>{liveLiters.toFixed(2).replace('.', ',')} L × {(fuelPrices[activeFuel] || fuelPrice || 0).toFixed(2).replace('.', ',')} {currency}/L</span>
                 </div>
 
                 {/* Botón único sincronizado con Saldo Restante para recargar o ver el saldo */}
@@ -2215,7 +2240,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                       <span className="text-xs font-black truncate">{shortLabel}</span>
                     </div>
                     <span className="text-[10px] font-mono text-amber-300 font-bold mt-0.5">
-                      {tankVal.toFixed(0)} {currency}
+                      {tankVal.toFixed(1).replace('.', ',')} {currency}
                     </span>
                   </button>
                 );
@@ -2244,18 +2269,27 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             )}
           </div>
 
-          {/* Registro del último tanqueo guardado para este combustible */}
-          {fuelTanks[activeFuel]?.lastRefuelAmount ? (
-            <div className="flex items-center justify-between text-[11px] px-3 py-1.5 rounded-xl bg-[#141B2A] border border-slate-700/60 text-slate-300">
+          {/* Registro del último tanqueo guardado en la tarjeta principal */}
+          {(ultimoTanqueo || fuelTanks[activeFuel]?.lastRefuelAmount) && (
+            <div className="flex items-center justify-between text-[11px] px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-slate-300">
               <span className="flex items-center space-x-1.5 truncate">
-                <span className="text-emerald-400 font-bold">⛽ Tanqueo guardado:</span>
-                <span className="font-mono text-white font-black">+{fuelTanks[activeFuel]?.lastRefuelAmount?.toFixed(2)} {currency}</span>
+                <span className="text-emerald-400 font-bold">⛽ Último tanqueo guardado:</span>
+                <span className="font-mono text-white font-black">
+                  +{(ultimoTanqueo?.cost ?? fuelTanks[activeFuel]?.lastRefuelAmount ?? 0).toFixed(2)} {currency}
+                </span>
+                {ultimoTanqueo?.liters && (
+                  <span className="text-emerald-300 text-[10px] font-mono">
+                    ({ultimoTanqueo.liters.toFixed(2)} L)
+                  </span>
+                )}
               </span>
               <span className="text-slate-400 text-[10px] shrink-0 font-bold ml-2">
-                {fuelTanks[activeFuel]?.lastRefuelPrice ? `@ ${fuelTanks[activeFuel]?.lastRefuelPrice?.toFixed(2)} ${currency}/L` : ''}
+                {(ultimoTanqueo?.pricePerLiter ?? fuelTanks[activeFuel]?.lastRefuelPrice)
+                  ? `@ ${(ultimoTanqueo?.pricePerLiter ?? fuelTanks[activeFuel]?.lastRefuelPrice).toFixed(2)} ${currency}/L`
+                  : ''}
               </span>
             </div>
-          ) : null}
+          )}
 
           {/* Big Orange Button: + Registrar Tanqueo */}
           <button
@@ -2579,7 +2613,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setShowVehicleModal(false)}
+                onClick={handleCancelVehicleModal}
                 className="text-slate-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -2720,8 +2754,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2">
               <button
                 type="button"
-                onClick={() => setShowVehicleModal(false)}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 cursor-pointer"
+                onClick={handleCancelVehicleModal}
+                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 cursor-pointer active:scale-95 transition"
               >
                 Cancelar
               </button>

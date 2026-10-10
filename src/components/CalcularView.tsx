@@ -482,6 +482,9 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
             <button
               type="button"
               onClick={() => {
+                setSnapshotVehicleKey(inputs.vehicleType || 'sedan');
+                setSnapshotEngineKey(selectedEngineKey);
+                setSnapshotBase(inputs.customBaseConsumption || calc.activeBaseConsumption || 7.5);
                 setModalVehicleKey(activeVehicleKey);
                 setIsEngineModalOpen(true);
               }}
@@ -1206,7 +1209,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setIsEngineModalOpen(false)}
+                onClick={handleCancelEngineModal}
                 className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition active:scale-90 cursor-pointer"
               >
                 <X className="w-4 h-4" />
