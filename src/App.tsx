@@ -48,7 +48,16 @@ export default function App() {
   const initialCountry = detectDefaultCountry();
   const initialCountryData = DATA_PAIS[initialCountry] || DATA_PAIS.PL;
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    return getStoredActiveUser() || {
+      uid: 'guest_conductor_pro',
+      email: 'conductor@litrometrik.pro',
+      displayName: 'Conductor PRO',
+      photoURL: null,
+      emailVerified: true,
+      providerId: 'guest',
+    };
+  });
   const [authLoading, setAuthLoading] = useState(false);
   const [isDesktopFrame, setIsDesktopFrame] = useState(false);
 
@@ -57,6 +66,15 @@ export default function App() {
     const stored = getStoredActiveUser();
     if (stored) {
       setCurrentUser(stored);
+    } else if (!currentUser) {
+      setCurrentUser({
+        uid: 'guest_conductor_pro',
+        email: 'conductor@litrometrik.pro',
+        displayName: 'Conductor PRO',
+        photoURL: null,
+        emailVerified: true,
+        providerId: 'guest',
+      });
     }
 
     // 1. Cloud Firestore / Firebase Auth listener
@@ -130,13 +148,19 @@ export default function App() {
           setSavedTrips([]);
         }
       } else {
-        // Fallback to local stored user
+        // Fallback to local stored user or default active session
         const localUser = getStoredActiveUser();
         if (localUser) {
           setCurrentUser(localUser);
         } else {
-          setCurrentUser(null);
-          setSavedTrips([]);
+          setCurrentUser({
+            uid: 'guest_conductor_pro',
+            email: 'conductor@litrometrik.pro',
+            displayName: 'Conductor PRO',
+            photoURL: null,
+            emailVerified: true,
+            providerId: 'guest',
+          });
         }
       }
       setAuthLoading(false);
@@ -411,22 +435,9 @@ export default function App() {
 
   const totalKmCalculated = Math.round(savedTrips.reduce((acc, t) => acc + (t.distanceKm || 0), 0));
 
-  // ---------------- AUTH GATE VIEW (FIRST SCREEN ON OPENING) ----------------
-  if (authLoading) {
-    return <SplashScreen />;
-  }
-
+  // ---------------- MAIN APPLICATION LAUNCH (NO BLOCKING GATES) ----------------
   if (!currentUser) {
-    return (
-      <AuthGate
-        onAuthSuccess={(authUser) => {
-          const u = authUser || getStoredActiveUser();
-          if (u) {
-            setCurrentUser(u);
-          }
-        }}
-      />
-    );
+    return null;
   }
 
   // ---------------- MAIN APPLICATION VIEW ----------------
