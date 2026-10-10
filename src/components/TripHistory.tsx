@@ -51,7 +51,7 @@ export const TripHistory: React.FC<TripHistoryProps> = ({
             </p>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+          <div className="flex-1 overflow-y-auto overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch] space-y-3 pr-2">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
               <span>Total de registros: <strong className="text-white font-bold">{trips.length}</strong></span>
               <button

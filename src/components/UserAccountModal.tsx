@@ -159,7 +159,7 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4 overflow-y-auto flex-1">
+        <div className="p-5 space-y-4 overflow-y-auto overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch] flex-1">
           {/* User Card */}
           <div className="p-4 rounded-2xl bg-[#1A2234] border border-slate-700/70 flex items-center space-x-3.5 shadow-sm">
             <div className="w-14 h-14 rounded-2xl bg-[#080B11] border border-slate-700 flex items-center justify-center text-2xl shadow-inner shrink-0">

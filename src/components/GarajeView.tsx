@@ -1217,10 +1217,10 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
 
       {/* ---------------- MODAL 2: DIAGNÓSTICO COMPLETO Y SINCRONIZACIÓN DE TODAS LAS CATEGORÍAS ---------------- */}
       {showDiagnosisModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="bg-[#121620] border border-slate-700 w-full max-w-md rounded-3xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-[#121620] border border-slate-700 w-full max-w-md rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Modal Header Fijo */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 shrink-0 bg-[#121620]">
               <div className="flex items-center space-x-2.5">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${mechanicalDiagnosis.statusBg}`}>
                   <Activity className={`w-5 h-5 ${mechanicalDiagnosis.statusColor}`} />
@@ -1240,6 +1240,9 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
                 <X className="w-4.5 h-4.5" />
               </button>
             </div>
+
+            {/* Cuerpo con Scroll Suave e Independiente */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
 
             {/* Score Ring / Summary Header */}
             <div className={`p-4 rounded-2xl border flex items-center justify-between ${mechanicalDiagnosis.statusBg}`}>
@@ -1382,14 +1385,16 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
               ))}
             </div>
 
-            {/* Modal Footer */}
-            <div className="pt-2 border-t border-slate-800 flex justify-end">
+            </div>
+
+            {/* Modal Footer Fijo y Visible */}
+            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#0C101A] shrink-0">
               <button
                 type="button"
                 onClick={() => setShowDiagnosisModal(false)}
-                className="w-full py-3 rounded-2xl bg-[#FF4F00] text-white font-black text-xs cursor-pointer shadow-lg shadow-[#FF4F00]/25"
+                className="w-full py-3 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] text-white font-black text-xs cursor-pointer shadow-lg shadow-[#FF4F00]/25 transition active:scale-98"
               >
-                Cerrar
+                Cerrar Diagnóstico
               </button>
             </div>
           </div>

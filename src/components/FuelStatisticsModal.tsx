@@ -1279,7 +1279,7 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
               onClick={() => setActiveTelemetryModal({
                 title: 'CONSUMO EN VIVO',
                 subtitle: 'Litros en Tiempo Real',
-                description: 'Volumen de combustible consumido (en litros) en tiempo real, combinando el movimiento por GPS y el ralentí si el vehículo está detenido.',
+                description: 'Volumen de combustible consumido (en litros) en tiempo real, combinando el movimiento por GPS y el motor en espera cuando el vehículo está detenido.',
                 iconType: 'liters',
               })}
               className="p-4 rounded-2xl bg-[#0F172A] hover:bg-slate-800/80 border border-slate-700/80 hover:border-purple-400 transition-all shadow-sm cursor-pointer active:scale-95 group relative"

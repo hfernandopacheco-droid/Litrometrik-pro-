@@ -198,7 +198,7 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
   const levelInfo = getLevelInfo(totalKmCalculated);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0a0b12] overflow-y-auto animate-fadeIn pb-24 font-sans select-none">
+    <div className="fixed inset-0 z-50 bg-[#0a0b12] overflow-y-auto overscroll-contain [touch-action:pan-y] [-webkit-overflow-scrolling:touch] animate-fadeIn pb-24 font-sans">
       
       {/* Header */}
       <div className="sticky top-0 z-20 bg-[#10121f]/95 backdrop-blur-xl border-b border-white/10 shadow-xl">

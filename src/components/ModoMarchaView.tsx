@@ -79,6 +79,7 @@ interface ModoMarchaViewProps {
   onCountryChange: (country: CountryCode) => void;
   onOpenHistory?: () => void;
   currentUser?: any;
+  onLogout?: () => void;
 }
 
 export interface ViajeRegistro {
@@ -105,6 +106,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   selectedCountry,
   onCountryChange,
   currentUser,
+  onLogout,
 }) => {
   const defaultPrices: Record<CountryCode, Record<FuelKey, number>> = {
     PL: { 'Gasolina Pb95': 6.09, 'Diésel ON': 6.15, 'Gas LPG': 2.89 },
@@ -1875,12 +1877,12 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   currentSpeed < 3 ? (
                     <span className="text-[10px] sm:text-[11px] text-amber-400 font-bold flex items-center space-x-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                      <span>En Ralentí ({activeFuel === 'Gas LPG' ? (isACActive ? '1,15' : '0,95') : (isACActive ? '1,00' : '0,80')} L/h)</span>
+                      <span>Detenido / En Espera ({activeFuel === 'Gas LPG' ? (isACActive ? '1,15' : '0,95') : (isACActive ? '1,00' : '0,80')} L/h)</span>
                     </span>
                   ) : (
                     <span className="text-[10px] sm:text-[11px] text-emerald-400 font-bold flex items-center space-x-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      <span>En Movimiento ({((baseConsumptionL100 * (transmission === 'automatic' ? 1.08 : 1.0) * (activeFuel === 'Gas LPG' ? 1.2 : 1.0)) + (isACActive ? acAddonAmount : 0)).toFixed(1)} L/100km)</span>
+                      <span>En Movimiento ({((baseConsumptionL100 * (transmission === 'automatic' ? 1.08 : 1.0) * (activeFuel === 'Gas LPG' ? 1.2 : activeFuel === 'Diésel ON' ? 0.85 : 1.0)) + (isACActive ? acAddonAmount : 0)).toFixed(1)} L/100km)</span>
                     </span>
                   )
                 ) : (
@@ -1891,8 +1893,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* Campo 3: GASTO EN VIVO (Bottom-Left) con SELECTOR DE 3 COMBUSTIBLES Y SU PANEL DE SALDO DE TANQUE */}
-            <div className="relative min-h-[142px] sm:min-h-[148px] p-3 sm:p-3.5 rounded-bl-[32px] rounded-br-2xl rounded-tl-2xl rounded-tr-[42px] bg-[#121620]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between overflow-hidden">
+            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Solo cálculo exacto y botón sincronizado con Saldo Restante */}
+            <div className="relative min-h-[142px] sm:min-h-[148px] p-3.5 sm:p-4 rounded-bl-[32px] rounded-br-2xl rounded-tl-2xl rounded-tr-[42px] bg-[#121620]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between overflow-hidden">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase">
                   GASTO EN VIVO
@@ -1907,76 +1909,53 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   {liveCost.toFixed(2).replace('.', ',')} <span className="text-xs font-bold">{currency}</span>
                 </div>
 
-                {/* SELECTOR INTERACTIVO DIRECTO DE 3 COMBUSTIBLES (LPG / Gasolina / Diésel) */}
-                <div className="grid grid-cols-3 gap-1 mt-1.5">
-                  {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((fKey) => {
-                    const isSel = activeFuel === fKey;
-                    const shortLabel = fKey === 'Gas LPG' ? 'LPG' : fKey === 'Diésel ON' ? 'Diésel' : 'Gasolina';
-                    const icon = fKey === 'Gas LPG' ? '🔥' : fKey === 'Diésel ON' ? '🛢️' : '⛽';
-                    return (
-                      <button
-                        key={fKey}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSwitchFuel(fKey);
-                        }}
-                        className={`py-1 px-1 rounded-xl text-[10px] font-black transition-all flex items-center justify-center space-x-1 cursor-pointer active:scale-95 ${
-                          isSel
-                            ? 'bg-[#FF4F00] text-white shadow-sm shadow-[#FF4F00]/40 ring-1 ring-white/20'
-                            : 'bg-[#182030] hover:bg-[#20293D] text-slate-300 border border-slate-700/60'
-                        }`}
-                        title={`Seleccionar combustible ${shortLabel}`}
-                      >
-                        <span className="text-xs">{icon}</span>
-                        <span className="truncate">{shortLabel}</span>
-                      </button>
-                    );
-                  })}
+                {/* Explicación transparente del cálculo matemático */}
+                <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate mt-0.5">
+                  <span>{liveLiters.toFixed(2).replace('.', ',')} L × {fuelPrices[activeFuel]?.toFixed(2)} {currency}/L</span>
                 </div>
 
-                {/* Panel de saldo restante en tanque para el combustible seleccionado */}
-                <div className="mt-1.5 p-1 rounded-lg bg-black/40 border border-slate-800/80 flex items-center justify-between text-[9px] sm:text-[10px]">
-                  <div className="flex items-center space-x-1 min-w-0">
-                    <span className="text-slate-400 font-bold truncate">
+                {/* Botón único sincronizado que aparece por defecto con el combustible seleccionado en Saldo Restante */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRefuelFuelType(activeFuel);
+                    const p = fuelPrices[activeFuel] || fuelPrice;
+                    setRefuelAmountInput('');
+                    setRefuelPriceInput(p.toFixed(2));
+                    setShowRefuelModal(true);
+                  }}
+                  className="mt-2 w-full py-1.5 px-2.5 rounded-xl bg-[#182030] hover:bg-[#20293D] border border-slate-700/80 text-white flex items-center justify-between text-[10px] font-black transition cursor-pointer active:scale-95 shadow-sm group"
+                  title="Sincronizado con Saldo Restante. Toca para recargar tanque"
+                >
+                  <div className="flex items-center space-x-1.5 min-w-0">
+                    <span className="text-xs">{activeFuel === 'Gas LPG' ? '🔥' : activeFuel === 'Diésel ON' ? '🛢️' : '⛽'}</span>
+                    <span className="text-amber-300 font-bold truncate">
                       Tanque {activeFuel === 'Gas LPG' ? 'LPG' : activeFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina'}:
                     </span>
-                    <span className="font-mono font-black text-amber-300 truncate">
-                      {currentFuelBalance.toFixed(1).replace('.', ',')} {currency} ({currentRemainingLiters.toFixed(1)}L)
+                    <span className="font-mono text-white font-black truncate">
+                      {currentFuelBalance.toFixed(1).replace('.', ',')} {currency}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRefuelFuelType(activeFuel);
-                      const p = fuelPrices[activeFuel] || fuelPrice;
-                      setRefuelAmountInput('');
-                      setRefuelPriceInput(p.toFixed(2));
-                      setShowRefuelModal(true);
-                    }}
-                    className="ml-1 px-1.5 py-0.5 rounded-md bg-[#FF4F00]/20 hover:bg-[#FF4F00]/30 text-[#FF4F00] font-bold text-[8px] sm:text-[9px] border border-[#FF4F00]/40 shrink-0 cursor-pointer transition active:scale-95"
-                    title="Registrar tanqueo para este combustible"
-                  >
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[#FF4F00]/20 text-[#FF4F00] border border-[#FF4F00]/40 group-hover:bg-[#FF4F00] group-hover:text-white transition shrink-0 font-black">
                     + Tanqueo
-                  </button>
-                </div>
+                  </span>
+                </button>
               </div>
             </div>
 
-            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) - Letras perfectamente encajadas y 100% visibles */}
+            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) - Encajado simétrico, bonito y 100% visible */}
             <div
               onClick={toggleAC}
-              className={`relative min-h-[142px] sm:min-h-[148px] p-3 sm:p-3.5 rounded-br-[32px] rounded-bl-2xl rounded-tr-2xl rounded-tl-[42px] border transition-all duration-300 flex flex-col justify-between text-right cursor-pointer select-none overflow-hidden ${
+              className={`relative min-h-[142px] sm:min-h-[148px] p-3.5 sm:p-4 rounded-br-[32px] rounded-bl-2xl rounded-tr-2xl rounded-tl-[42px] border transition-all duration-300 flex flex-col justify-between text-right cursor-pointer select-none overflow-hidden ${
                 isACActive
                   ? 'bg-gradient-to-br from-[#0B2138] via-[#0A1A2C] to-[#121620] border-cyan-400/80 shadow-[0_0_30px_rgba(0,212,255,0.25)] ring-1 ring-cyan-400/30'
                   : 'bg-[#121620]/95 border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700'
               }`}
             >
-              {/* Header con Aire A/C a la izquierda y Switch a la derecha: completamente visible sin recortes */}
-              <div className="flex items-center justify-between w-full gap-1">
+              {/* Header con Aire A/C a la izquierda y Switch táctil a la derecha */}
+              <div className="flex items-center justify-between w-full pl-2">
                 <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xl border text-[10px] sm:text-[11px] font-black tracking-wide uppercase transition-all shadow-sm shrink-0 whitespace-nowrap ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[10px] sm:text-[11px] font-black tracking-wide uppercase transition-all shadow-sm shrink-0 whitespace-nowrap ${
                     isACActive
                       ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-cyan-500/20'
                       : 'bg-slate-800/90 border-slate-700/80 text-slate-300'
@@ -1992,11 +1971,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
                 {/* Tactile Switch Toggle */}
                 <div
-                  className={`w-8 h-4.5 rounded-full transition-colors flex items-center px-0.5 shadow-inner shrink-0 ${
+                  className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 shadow-inner shrink-0 ${
                     isACActive ? 'bg-[#00D4FF] justify-end' : 'bg-slate-700 justify-start'
                   }`}
                 >
-                  <div className="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform" />
+                  <div className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
                 </div>
               </div>
 
@@ -2018,7 +1997,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                     isACActive ? 'text-cyan-300' : 'text-slate-500'
                   }`}
                 >
-                  {isACActive ? 'Aire A/C (+0.6 L/100)' : 'Aire A/C Apagado'}
+                  {isACActive ? `Compresor Activo (+${acAddonAmount.toFixed(1)} L/100)` : 'Compresor Apagado (0.0)'}
                 </p>
               </div>
             </div>
@@ -2133,7 +2112,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                       : 'text-slate-400'
                   }`}
                 >
-                  {isRunning ? (currentSpeed < 3 ? 'RALENTÍ' : 'EN MARCHA') : 'PAUSADO'}
+                  {isRunning ? (currentSpeed < 3 ? 'DETENIDO' : 'EN MARCHA') : 'PAUSADO'}
                 </span>
               </div>
 
@@ -2550,17 +2529,17 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL SELECCIONAR / CALIBRAR VEHÍCULO Y MOTORIZACIÓN INVESTIGADA ---------------- */}
       {showVehicleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Header Fijo */}
+            <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#111622]">
               <div className="flex items-center space-x-2.5">
                 <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
                   <Car className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-white">Vehículo y Motorización Real</h3>
-                  <p className="text-[10px] text-slate-400">Datos técnicos investigados WLTP y consumo oficial</p>
+                  <p className="text-[10px] text-slate-400">Datos técnicos oficiales WLTP y consumo calibrado</p>
                 </div>
               </div>
               <button
@@ -2572,134 +2551,138 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </button>
             </div>
 
-            {/* 1. Categoría de Vehículo (Gráficas 3D Profesionales Reales) */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
-                1. Categoría de Carrocería
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {VEHICLE_PRESETS.map((preset) => {
-                  const isSel = modalTempVehicleType === preset.type;
-                  return (
-                    <button
-                      key={preset.type}
-                      type="button"
-                      onClick={() => {
-                        setModalTempVehicleType(preset.type);
-                        setModalTempVehicleModelName(preset.label);
-                        const defEng = preset.engines[1] || preset.engines[0];
-                        setModalTempEngineName(defEng.name);
-                        setModalTempBaseL100(defEng.baseL100);
-                      }}
-                      className={`p-2 rounded-2xl border text-center transition flex flex-col items-center justify-between cursor-pointer active:scale-95 ${
-                        isSel
-                          ? 'bg-sky-500/20 border-sky-400 text-white shadow-[0_0_15px_rgba(0,212,255,0.2)]'
-                          : 'bg-[#182030] border-slate-700/80 text-slate-300 hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="w-12 h-10 flex items-center justify-center">
-                        {renderMarchaVehicle3D(preset.type, 42)}
-                      </div>
-                      <div className="text-[11px] font-black truncate w-full mt-1">
-                        {preset.shortLabel}
-                      </div>
-                      <div className="text-[9px] text-sky-400 font-mono font-bold">
-                        {preset.defaultBaseL100} L/100
-                      </div>
-                    </button>
-                  );
-                })}
+            {/* Cuerpo con Scroll Suave e Independiente */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
+              {/* 1. Categoría de Vehículo */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
+                  1. Categoría de Carrocería
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {VEHICLE_PRESETS.map((preset) => {
+                    const isSel = modalTempVehicleType === preset.type;
+                    return (
+                      <button
+                        key={preset.type}
+                        type="button"
+                        onClick={() => {
+                          setModalTempVehicleType(preset.type);
+                          setModalTempVehicleModelName(preset.label);
+                          const defEng = preset.engines[1] || preset.engines[0];
+                          setModalTempEngineName(defEng.name);
+                          setModalTempBaseL100(defEng.baseL100);
+                        }}
+                        className={`p-2 rounded-2xl border text-center transition flex flex-col items-center justify-between cursor-pointer active:scale-95 ${
+                          isSel
+                            ? 'bg-sky-500/20 border-sky-400 text-white shadow-[0_0_15px_rgba(0,212,255,0.2)]'
+                            : 'bg-[#182030] border-slate-700/80 text-slate-300 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="w-12 h-10 flex items-center justify-center">
+                          {renderMarchaVehicle3D(preset.type, 42)}
+                        </div>
+                        <div className="text-[11px] font-black truncate w-full mt-1">
+                          {preset.shortLabel}
+                        </div>
+                        <div className="text-[9px] text-sky-400 font-mono font-bold">
+                          {preset.defaultBaseL100} L/100
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Motorización Investigada para la categoría */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
+                  2. Motor & Cilindrada
+                </label>
+                <div className="space-y-2">
+                  {(
+                    UNIFIED_VEHICLE_CATALOG[modalTempVehicleType]?.engines ||
+                    UNIFIED_VEHICLE_CATALOG.sedan.engines
+                  ).map((eng) => {
+                    const isSel = modalTempEngineName === eng.name;
+                    return (
+                      <button
+                        key={eng.key}
+                        type="button"
+                        onClick={() => {
+                          setModalTempEngineName(eng.name);
+                          setModalTempBaseL100(eng.baseL100);
+                        }}
+                        className={`w-full p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between active:scale-98 ${
+                          isSel
+                            ? 'bg-gradient-to-r from-sky-500/20 to-blue-600/20 border-sky-400 text-white shadow-sm'
+                            : 'bg-[#161D2B] border-slate-700/70 text-slate-300 hover:bg-[#1E2738]'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 pr-2">
+                          <div className="text-xs font-black truncate text-white">{eng.name}</div>
+                          <div className="text-[10px] text-slate-400 truncate mt-0.5">{eng.displacement} • {eng.powerCV}</div>
+                          <div className="text-[9px] text-slate-500 truncate mt-0.5">{eng.description}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono text-sky-400 font-black text-xs block">{eng.baseL100.toFixed(1)}</span>
+                          <span className="text-[9px] text-slate-500">L/100km</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Transmisión */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
+                  3. Transmisión
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalTempTransmission('manual')}
+                    className={`p-2.5 rounded-xl border text-center text-xs font-black transition cursor-pointer ${
+                      modalTempTransmission === 'manual'
+                        ? 'bg-sky-500/20 border-sky-400 text-white'
+                        : 'bg-[#1A202C] border-slate-700/60 text-slate-400'
+                    }`}
+                  >
+                    Manual (x1.0)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalTempTransmission('automatic')}
+                    className={`p-2.5 rounded-xl border text-center text-xs font-black transition cursor-pointer ${
+                      modalTempTransmission === 'automatic'
+                        ? 'bg-sky-500/20 border-sky-400 text-white'
+                        : 'bg-[#1A202C] border-slate-700/60 text-slate-400'
+                    }`}
+                  >
+                    Automática (+8%)
+                  </button>
+                </div>
+              </div>
+
+              {/* Summary preview */}
+              <div className="p-3 rounded-2xl bg-black/40 border border-slate-800 text-xs flex items-center justify-between">
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Vehículo a sincronizar:</span>
+                  <span className="font-bold text-white text-xs truncate">
+                    {modalTempVehicleModelName || modalTempEngineName}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-400 block text-[10px]">Consumo calibrado:</span>
+                  <span className="font-mono font-black text-sky-400 text-sm">
+                    {(modalTempBaseL100 * (modalTempTransmission === 'automatic' ? 1.08 : 1.0)).toFixed(1)} L/100km
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* 2. Motorización Investigada para la categoría */}
-            <div className="space-y-1.5 pt-1">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
-                2. Motor & Cilindrada
-              </label>
-              <div className="space-y-2">
-                {(
-                  UNIFIED_VEHICLE_CATALOG[modalTempVehicleType]?.engines ||
-                  UNIFIED_VEHICLE_CATALOG.sedan.engines
-                ).map((eng) => {
-                  const isSel = modalTempEngineName === eng.name;
-                  return (
-                    <button
-                      key={eng.key}
-                      type="button"
-                      onClick={() => {
-                        setModalTempEngineName(eng.name);
-                        setModalTempBaseL100(eng.baseL100);
-                      }}
-                      className={`w-full p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between active:scale-98 ${
-                        isSel
-                          ? 'bg-gradient-to-r from-sky-500/20 to-blue-600/20 border-sky-400 text-white shadow-sm'
-                          : 'bg-[#161D2B] border-slate-700/70 text-slate-300 hover:bg-[#1E2738]'
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1 pr-2">
-                        <div className="text-xs font-black truncate text-white">{eng.name}</div>
-                        <div className="text-[10px] text-slate-400 truncate mt-0.5">{eng.displacement} • {eng.powerCV}</div>
-                        <div className="text-[9px] text-slate-500 truncate mt-0.5">{eng.description}</div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="font-mono text-sky-400 font-black text-xs block">{eng.baseL100.toFixed(1)}</span>
-                        <span className="text-[9px] text-slate-500">L/100km</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 3. Transmisión */}
-            <div className="space-y-1.5 pt-1">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
-                3. Transmisión
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setModalTempTransmission('manual')}
-                  className={`p-2.5 rounded-xl border text-center text-xs font-black transition cursor-pointer ${
-                    modalTempTransmission === 'manual'
-                      ? 'bg-sky-500/20 border-sky-400 text-white'
-                      : 'bg-[#1A202C] border-slate-700/60 text-slate-400'
-                  }`}
-                >
-                  Manual (x1.0)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModalTempTransmission('automatic')}
-                  className={`p-2.5 rounded-xl border text-center text-xs font-black transition cursor-pointer ${
-                    modalTempTransmission === 'automatic'
-                      ? 'bg-sky-500/20 border-sky-400 text-white'
-                      : 'bg-[#1A202C] border-slate-700/60 text-slate-400'
-                  }`}
-                >
-                  Automática (+8%)
-                </button>
-              </div>
-            </div>
-
-            {/* Summary preview */}
-            <div className="p-3 rounded-2xl bg-black/40 border border-slate-800 text-xs flex items-center justify-between">
-              <div>
-                <span className="text-slate-400 block text-[10px]">Vehículo a sincronizar:</span>
-                <span className="font-bold text-white text-xs truncate">
-                  {modalTempVehicleModelName || modalTempEngineName}
-                </span>
-              </div>
-              <div className="text-right">
-                <span className="text-slate-400 block text-[10px]">Consumo calibrado:</span>
-                <span className="font-mono font-black text-sky-400 text-sm">
-                  {(modalTempBaseL100 * (modalTempTransmission === 'automatic' ? 1.08 : 1.0)).toFixed(1)} L/100km
-                </span>
-              </div>
-            </div>
-
-            <div className="flex space-x-2 pt-2">
+            {/* Footer Fijo y Permanente (Siempre visible para guardar) */}
+            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2">
               <button
                 type="button"
                 onClick={() => setShowVehicleModal(false)}
@@ -2710,9 +2693,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               <button
                 type="button"
                 onClick={handleApplyVehicleConfig}
-                className="flex-1 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-md shadow-sky-500/25 cursor-pointer active:scale-95 transition"
+                className="flex-1 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-xs shadow-md shadow-sky-500/25 cursor-pointer active:scale-95 transition flex items-center justify-center space-x-1"
               >
-                Aplicar y Sincronizar
+                <Check className="w-4 h-4" />
+                <span>Aplicar y Sincronizar</span>
               </button>
             </div>
           </div>
@@ -2721,9 +2705,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL LISTA DE COMBUSTIBLES (Imagen 3) ---------------- */}
       {showFuelPickerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#121620]">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-xl bg-[#FF4F00]/20 text-[#FF4F00] flex items-center justify-center">
                   <Fuel className="w-4 h-4" />
@@ -2736,57 +2720,69 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowFuelPickerModal(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-2">
-              {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((fKey) => {
-                const isCurrent = activeFuel === fKey;
-                const currentPrice = fuelPrices[fKey] || defaultPrices[selectedCountry]?.[fKey] || 6.09;
-                return (
-                  <button
-                    key={fKey}
-                    type="button"
-                    onClick={() => initiateFuelChange(fKey)}
-                    className={`w-full p-3.5 rounded-2xl border transition flex items-center justify-between text-left cursor-pointer ${
-                      isCurrent
-                        ? 'bg-[#FF4F00]/15 border-[#FF4F00] text-white shadow-md'
-                        : 'bg-[#1A202C] border-slate-700/70 text-slate-300 hover:border-slate-500'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <span className="text-xl">
-                        {fKey === 'Gas LPG' ? '🔥' : fKey === 'Diésel ON' ? '🛢️' : '⛽'}
-                      </span>
-                      <div>
-                        <div className="text-xs font-black">{fKey}</div>
-                        <div className="text-[10px] text-slate-400">
-                          {fKey === 'Gas LPG'
-                            ? 'Factor x1.20 • Máximo ahorro'
-                            : fKey === 'Diésel ON'
-                            ? 'Factor x0.85 • Alta eficiencia'
-                            : 'Factor x1.00 • Consumo estándar'}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
+              <div className="space-y-2">
+                {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((fKey) => {
+                  const isCurrent = activeFuel === fKey;
+                  const currentPrice = fuelPrices[fKey] || defaultPrices[selectedCountry]?.[fKey] || 6.09;
+                  return (
+                    <button
+                      key={fKey}
+                      type="button"
+                      onClick={() => initiateFuelChange(fKey)}
+                      className={`w-full p-3.5 rounded-2xl border transition flex items-center justify-between text-left cursor-pointer active:scale-98 ${
+                        isCurrent
+                          ? 'bg-[#FF4F00]/15 border-[#FF4F00] text-white shadow-md'
+                          : 'bg-[#1A202C] border-slate-700/70 text-slate-300 hover:border-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="text-xl">
+                          {fKey === 'Gas LPG' ? '🔥' : fKey === 'Diésel ON' ? '🛢️' : '⛽'}
+                        </span>
+                        <div>
+                          <div className="text-xs font-black">{fKey}</div>
+                          <div className="text-[10px] text-slate-400">
+                            {fKey === 'Gas LPG'
+                              ? 'Factor x1.20 • Máximo ahorro'
+                              : fKey === 'Diésel ON'
+                              ? 'Factor x0.85 • Alta eficiencia'
+                              : 'Factor x1.00 • Consumo estándar'}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="text-right">
-                      <span className="text-sm font-black font-mono text-[#FF4F00]">
-                        {currentPrice.toFixed(2)}
-                      </span>
-                      <span className="text-[10px] text-slate-400 block">{currency}/L</span>
-                    </div>
-                  </button>
-                );
-              })}
+                      <div className="text-right">
+                        <span className="text-sm font-black font-mono text-[#FF4F00]">
+                          {currentPrice.toFixed(2)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">{currency}/L</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="text-[10px] text-slate-400 leading-relaxed text-center px-2">
+                💡 Si cambias de combustible con un viaje en marcha, la app te preguntará si deseas guardar el tramo previo.
+              </p>
             </div>
 
-            <p className="text-[10px] text-slate-400 leading-relaxed text-center px-2">
-              💡 Si cambias de combustible con un viaje en marcha, la app te preguntará si deseas guardar el tramo previo.
-            </p>
+            <div className="p-3 sm:p-4 border-t border-slate-800 bg-[#0C101A] shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowFuelPickerModal(false)}
+                className="w-full py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer transition active:scale-98"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2875,9 +2871,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL REGISTRAR TANQUEO (UNIFICADO CON SELECTOR SUPERIOR) ---------------- */}
       {showRefuelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
+            {/* Header Fijo */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 shrink-0 bg-[#121620]">
               <h3 className="text-base font-black text-white flex items-center space-x-2">
                 <Plus className="w-5 h-5 text-[#FF4F00]" />
                 <span>Registrar Tanqueo</span>
@@ -2891,91 +2888,95 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </button>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Suma combustible al tanque y actualiza el precio global del combustible seleccionado.
-            </p>
+            {/* Cuerpo con Scroll Suave */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
+              <p className="text-xs text-slate-400">
+                Suma combustible al tanque y actualiza el precio global del combustible seleccionado.
+              </p>
 
-            <div className="space-y-3">
-              {/* 1. Selector de combustible en la parte superior */}
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1.5">
-                  Combustible a repostar:
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((f) => {
-                    const isSelected = refuelFuelType === f;
-                    const icon = f === 'Gas LPG' ? '🔥' : f === 'Diésel ON' ? '🛢️' : '⛽';
-                    const shortLabel = f === 'Gas LPG' ? 'LPG' : f === 'Gasolina Pb95' ? 'Gasolina' : 'Diésel';
-                    const storedP = fuelPrices[f] || defaultPrices[selectedCountry]?.[f] || 6.09;
+              <div className="space-y-3">
+                {/* 1. Selector de combustible en la parte superior */}
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                    Combustible a repostar:
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((f) => {
+                      const isSelected = refuelFuelType === f;
+                      const icon = f === 'Gas LPG' ? '🔥' : f === 'Diésel ON' ? '🛢️' : '⛽';
+                      const shortLabel = f === 'Gas LPG' ? 'LPG' : f === 'Gasolina Pb95' ? 'Gasolina' : 'Diésel';
+                      const storedP = fuelPrices[f] || defaultPrices[selectedCountry]?.[f] || 6.09;
 
-                    return (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => handleSelectRefuelFuel(f)}
-                        className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
-                          isSelected
-                            ? 'bg-[#FF4F00]/20 border-[#FF4F00] text-white shadow-[0_0_15px_rgba(255,79,0,0.3)] ring-1 ring-[#FF4F00]'
-                            : 'bg-[#080B11] border-slate-700/80 text-slate-300 hover:border-slate-500'
-                        }`}
-                      >
-                        <span className="text-base">{icon}</span>
-                        <span className="text-[11px] font-black mt-0.5 truncate w-full">{shortLabel}</span>
-                        <span className="text-[10px] font-mono text-[#FF4F00] font-bold mt-0.5">
-                          {storedP.toFixed(2)}
-                        </span>
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => handleSelectRefuelFuel(f)}
+                          className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                            isSelected
+                              ? 'bg-[#FF4F00]/20 border-[#FF4F00] text-white shadow-[0_0_15px_rgba(255,79,0,0.3)] ring-1 ring-[#FF4F00]'
+                              : 'bg-[#080B11] border-slate-700/80 text-slate-300 hover:border-slate-500'
+                          }`}
+                        >
+                          <span className="text-base">{icon}</span>
+                          <span className="text-[11px] font-black mt-0.5 truncate w-full">{shortLabel}</span>
+                          <span className="text-[10px] font-mono text-[#FF4F00] font-bold mt-0.5">
+                            {storedP.toFixed(2)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">
-                  Monto pagado ({currency})
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Ej. 100.00"
-                  value={refuelAmountInput}
-                  onChange={(e) => setRefuelAmountInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-base focus:outline-none focus:border-[#FF4F00]"
-                  autoFocus
-                />
-              </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Monto pagado ({currency})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Ej. 100.00"
+                    value={refuelAmountInput}
+                    onChange={(e) => setRefuelAmountInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-base focus:outline-none focus:border-[#FF4F00]"
+                    autoFocus
+                  />
+                </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">
-                  Precio por litro ({currency}/L)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={refuelPriceInput}
-                  onChange={(e) => setRefuelPriceInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-mono font-bold text-base focus:outline-none focus:border-[#FF4F00]"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  💡 Al cambiar este valor, se actualiza el precio global de {refuelFuelType} en toda la app.
-                </span>
-              </div>
-
-              {refuelAmountInput && parseFloat(refuelAmountInput) > 0 && (
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-400 flex items-center justify-between font-sans">
-                  <span>Equivalente:</span>
-                  <span>
-                    ~{(
-                      parseFloat(refuelAmountInput.replace(',', '.')) /
-                      (parseFloat(refuelPriceInput.replace(',', '.')) || (fuelPrices[refuelFuelType] || fuelPrice))
-                    ).toFixed(2)}{' '}
-                    Litros ({refuelFuelType})
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Precio por litro ({currency}/L)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={refuelPriceInput}
+                    onChange={(e) => setRefuelPriceInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-mono font-bold text-base focus:outline-none focus:border-[#FF4F00]"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    💡 Al cambiar este valor, se actualiza el precio global de {refuelFuelType} en toda la app.
                   </span>
                 </div>
-              )}
+
+                {refuelAmountInput && parseFloat(refuelAmountInput) > 0 && (
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-400 flex items-center justify-between font-sans">
+                    <span>Equivalente:</span>
+                    <span>
+                      ~{(
+                        parseFloat(refuelAmountInput.replace(',', '.')) /
+                        (parseFloat(refuelPriceInput.replace(',', '.')) || (fuelPrices[refuelFuelType] || fuelPrice))
+                      ).toFixed(2)}{' '}
+                      Litros ({refuelFuelType})
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex space-x-2 pt-2">
+            {/* Footer Fijo y Visible */}
+            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2">
               <button
                 type="button"
                 onClick={() => setShowRefuelModal(false)}
@@ -2998,9 +2999,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL AJUSTAR NIVEL ---------------- */}
       {showAdjustModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-[#121620] border border-slate-700 rounded-3xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
+            {/* Header Fijo */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 shrink-0 bg-[#121620]">
               <h3 className="text-base font-black text-white flex items-center space-x-2">
                 <Sliders className="w-5 h-5 text-[#FF4F00]" />
                 <span>Ajustar Saldo del Tanque</span>
@@ -3014,49 +3016,53 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </button>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Modifica directamente el valor disponible en el tanque:
-            </p>
+            {/* Cuerpo con Scroll Suave */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 [touch-action:pan-y] [-webkit-overflow-scrolling:touch]">
+              <p className="text-xs text-slate-400">
+                Modifica directamente el valor disponible en el tanque:
+              </p>
 
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">
-                  Saldo en dinero ({currency})
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={adjustBalanceInput}
-                  onChange={(e) => {
-                    setAdjustBalanceInput(e.target.value);
-                    const val = parseFloat(e.target.value) || 0;
-                    if (fuelPrice > 0) {
-                      setAdjustLitersInput((val / fuelPrice).toFixed(2));
-                    }
-                  }}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-base focus:outline-none focus:border-[#FF4F00]"
-                />
-              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Saldo en dinero ({currency})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={adjustBalanceInput}
+                    onChange={(e) => {
+                      setAdjustBalanceInput(e.target.value);
+                      const val = parseFloat(e.target.value) || 0;
+                      if (fuelPrice > 0) {
+                        setAdjustLitersInput((val / fuelPrice).toFixed(2));
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-base focus:outline-none focus:border-[#FF4F00]"
+                  />
+                </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">
-                  O ingresar directamente en Litros (L)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={adjustLitersInput}
-                  onChange={(e) => {
-                    setAdjustLitersInput(e.target.value);
-                    const l = parseFloat(e.target.value) || 0;
-                    setAdjustBalanceInput((l * fuelPrice).toFixed(2));
-                  }}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-base focus:outline-none focus:border-[#FF4F00]"
-                />
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    O ingresar directamente en Litros (L)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={adjustLitersInput}
+                    onChange={(e) => {
+                      setAdjustLitersInput(e.target.value);
+                      const l = parseFloat(e.target.value) || 0;
+                      setAdjustBalanceInput((l * fuelPrice).toFixed(2));
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-base focus:outline-none focus:border-[#FF4F00]"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex space-x-2 pt-2">
+            {/* Footer Fijo y Visible */}
+            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2">
               <button
                 type="button"
                 onClick={() => setShowAdjustModal(false)}
@@ -3083,7 +3089,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         currentUser={currentUser}
         onLogout={() => {
           signOutSupabase();
-          window.location.reload();
+          onLogout?.();
         }}
       />
     </div>

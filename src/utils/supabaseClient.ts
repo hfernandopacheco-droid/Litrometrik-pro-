@@ -352,6 +352,7 @@ export const signUpWithSupabase = async (
     password: pass,
     options: {
       data: {
+        full_name: fullName,
         nombre: fullName,
         moneda: currency,
       },
@@ -369,6 +370,7 @@ export const signUpWithSupabase = async (
       await supabase.from('profiles').upsert({
         id: user.id,
         email: user.email,
+        full_name: fullName,
         nombre: fullName,
         moneda: currency,
         updated_at: new Date().toISOString(),

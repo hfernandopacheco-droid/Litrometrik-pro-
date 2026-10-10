@@ -49,14 +49,7 @@ export default function App() {
   const initialCountryData = DATA_PAIS[initialCountry] || DATA_PAIS.PL;
 
   const [currentUser, setCurrentUser] = useState<any>(() => {
-    return getStoredActiveUser() || {
-      uid: 'guest_conductor_pro',
-      email: 'conductor@litrometrik.pro',
-      displayName: 'Conductor PRO',
-      photoURL: null,
-      emailVerified: true,
-      providerId: 'guest',
-    };
+    return getStoredActiveUser();
   });
   const [authLoading, setAuthLoading] = useState(false);
   const [isDesktopFrame, setIsDesktopFrame] = useState(false);
@@ -439,9 +432,29 @@ export default function App() {
 
   const totalKmCalculated = Math.round(savedTrips.reduce((acc, t) => acc + (t.distanceKm || 0), 0));
 
-  // ---------------- MAIN APPLICATION LAUNCH (NO BLOCKING GATES) ----------------
+  // ---------------- AUTHENTICATION VIEW (IF NOT LOGGED IN) ----------------
   if (!currentUser) {
-    return null;
+    return (
+      <AuthGate
+        onAuthSuccess={(user) => {
+          setCurrentUser(user);
+        }}
+        onContinueAsGuest={() => {
+          const guestUser = {
+            uid: 'guest',
+            email: 'invitado@litrometrik.pro',
+            displayName: 'Conductor Invitado',
+            photoURL: null,
+            emailVerified: true,
+            providerId: 'guest',
+            isGuest: true,
+          };
+          localStorage.setItem('litrometrik_active_user', JSON.stringify(guestUser));
+          localStorage.setItem('litrometrik_active_user_session', JSON.stringify(guestUser));
+          setCurrentUser(guestUser);
+        }}
+      />
+    );
   }
 
   // ---------------- MAIN APPLICATION VIEW ----------------
@@ -515,6 +528,11 @@ export default function App() {
               onCountryChange={(c) => handleInputsChange({ country: c })}
               onOpenHistory={() => setIsHistoryOpen(true)}
               currentUser={currentUser}
+              onLogout={() => {
+                localStorage.removeItem('litrometrik_active_user');
+                localStorage.removeItem('litrometrik_active_user_session');
+                setCurrentUser(null);
+              }}
             />
           </div>
 

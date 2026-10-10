@@ -418,6 +418,30 @@ export const AuthGate: React.FC<AuthGateProps> = ({
             </button>
           </form>
 
+          {/* Opción Continuar como Invitado */}
+          {onContinueAsGuest && (
+            <div className="pt-4 mt-4 border-t border-slate-800/80">
+              <button
+                type="button"
+                onClick={onContinueAsGuest}
+                className="w-full py-3 bg-[#172033] hover:bg-[#1E293B] text-slate-300 hover:text-white font-bold text-xs rounded-xl border border-slate-700/80 transition flex items-center justify-center space-x-2 cursor-pointer active:scale-98 shadow-sm"
+              >
+                <span>🚗 Continuar como Invitado (Sin Registro)</span>
+              </button>
+            </div>
+          )}
+
+          {/* Información de estado de Supabase / Nube */}
+          {!isSupabaseConfigured() && (
+            <div className="mt-4 p-3 rounded-xl bg-blue-950/40 border border-blue-900/60 text-[11px] text-blue-300/90 leading-relaxed flex items-start space-x-2">
+              <Database className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-white block">Modo Nube Directa & Local Activo</span>
+                <span>Las variables de Supabase están en modo respaldo. Puedes crear tu cuenta o iniciar sesión; tus datos y viajes se guardarán seguros en la nube y en tu dispositivo.</span>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 
