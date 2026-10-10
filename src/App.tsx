@@ -65,22 +65,19 @@ export default function App() {
     // 0. Initial check from stored session
     const stored = getStoredActiveUser();
     if (stored) {
-      setCurrentUser(stored);
-    } else if (!currentUser) {
-      setCurrentUser({
-        uid: 'guest_conductor_pro',
-        email: 'conductor@litrometrik.pro',
-        displayName: 'Conductor PRO',
-        photoURL: null,
-        emailVerified: true,
-        providerId: 'guest',
+      setCurrentUser((prev: any) => {
+        if (prev?.uid === stored.uid && prev?.email === stored.email) return prev;
+        return stored;
       });
     }
 
     // 1. Cloud Firestore / Firebase Auth listener
     const unsubFirebase = subscribeToAuth((fbUser) => {
       if (fbUser) {
-        setCurrentUser(fbUser);
+        setCurrentUser((prev: any) => {
+          if (prev?.uid === fbUser.uid && prev?.email === fbUser.email) return prev;
+          return fbUser;
+        });
       }
     });
 
@@ -93,7 +90,10 @@ export default function App() {
           email: sbUser.email,
           displayName: sbUser.user_metadata?.nombre || sbUser.email?.split('@')[0] || 'Conductor',
         };
-        setCurrentUser(appUser);
+        setCurrentUser((prev: any) => {
+          if (prev?.uid === appUser.uid && prev?.email === appUser.email) return prev;
+          return appUser;
+        });
         localStorage.setItem('litrometrik_active_user', JSON.stringify(appUser));
         localStorage.setItem('litrometrik_active_user_session', JSON.stringify(appUser));
 
@@ -111,7 +111,6 @@ export default function App() {
           if (fuelConfig) {
             if (fuelConfig.saldo_tanque !== undefined && fuelConfig.saldo_tanque !== null) {
               localStorage.setItem('litrometrik_fuel_balance_pln', fuelConfig.saldo_tanque.toString());
-              window.dispatchEvent(new Event('fuel-storage-updated'));
             }
           }
         } catch (_) {}
@@ -139,27 +138,19 @@ export default function App() {
               costPerKm: ct.distancia_km ? Number(ct.costo_total) / Number(ct.distancia_km) : 0,
               savingsVsGasoline: 0,
             }));
-            setSavedTrips(mapped);
-          } else {
-            // Fresh account starts clean
-            setSavedTrips([]);
+            setSavedTrips((prev) => {
+              if (JSON.stringify(prev) === JSON.stringify(mapped)) return prev;
+              return mapped;
+            });
           }
-        } catch (_) {
-          setSavedTrips([]);
-        }
+        } catch (_) {}
       } else {
-        // Fallback to local stored user or default active session
+        // Fallback to local stored user only if different
         const localUser = getStoredActiveUser();
         if (localUser) {
-          setCurrentUser(localUser);
-        } else {
-          setCurrentUser({
-            uid: 'guest_conductor_pro',
-            email: 'conductor@litrometrik.pro',
-            displayName: 'Conductor PRO',
-            photoURL: null,
-            emailVerified: true,
-            providerId: 'guest',
+          setCurrentUser((prev: any) => {
+            if (prev?.uid === localUser.uid && prev?.email === localUser.email) return prev;
+            return localUser;
           });
         }
       }
@@ -217,7 +208,10 @@ export default function App() {
       if (userLocalTripsRaw) {
         const parsed = JSON.parse(userLocalTripsRaw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setSavedTrips(parsed);
+          setSavedTrips((prev) => {
+            if (JSON.stringify(prev) === userLocalTripsRaw) return prev;
+            return parsed;
+          });
         }
       }
     } catch (_) {}
@@ -232,6 +226,7 @@ export default function App() {
             if (!map.has(t.id)) map.set(t.id, t);
           });
           const merged = Array.from(map.values());
+          if (JSON.stringify(prev) === JSON.stringify(merged)) return prev;
           try {
             localStorage.setItem(`fuel_trips_pln_${currentUser.uid}`, JSON.stringify(merged));
             localStorage.setItem('fuel_trips_pln', JSON.stringify(merged));
@@ -245,19 +240,24 @@ export default function App() {
     getCloudVehicleConfig(currentUser.uid).then((vConfig) => {
       if (vConfig) {
         if (typeof vConfig.fuelBalance === 'number') {
-          localStorage.setItem('litrometrik_fuel_balance_pln', vConfig.fuelBalance.toString());
-          window.dispatchEvent(new Event('fuel-storage-updated'));
+          const currentBal = localStorage.getItem('litrometrik_fuel_balance_pln');
+          if (currentBal !== vConfig.fuelBalance.toString()) {
+            localStorage.setItem('litrometrik_fuel_balance_pln', vConfig.fuelBalance.toString());
+          }
         }
       }
     });
 
     const unsub = subscribeToCloudCollection(currentUser.uid, 'viajes', (cloudTrips) => {
       if (cloudTrips && cloudTrips.length > 0) {
-        setSavedTrips(cloudTrips);
-        try {
-          localStorage.setItem(`fuel_trips_pln_${currentUser.uid}`, JSON.stringify(cloudTrips));
-          localStorage.setItem('fuel_trips_pln', JSON.stringify(cloudTrips));
-        } catch (_) {}
+        setSavedTrips((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(cloudTrips)) return prev;
+          try {
+            localStorage.setItem(`fuel_trips_pln_${currentUser.uid}`, JSON.stringify(cloudTrips));
+            localStorage.setItem('fuel_trips_pln', JSON.stringify(cloudTrips));
+          } catch (_) {}
+          return cloudTrips;
+        });
       }
     });
     return () => {
@@ -302,13 +302,16 @@ export default function App() {
       const c = e.detail?.country as CountryCode;
       if (c && DATA_PAIS[c]) {
         const nextCountryData = DATA_PAIS[c];
-        setInputs((prev) => ({
-          ...prev,
-          country: c,
-          pricePerLiter: nextCountryData.preciosDefecto[prev.fuelType === 'diesel' ? 'diesel' : prev.fuelType === 'lpg' || prev.fuelType === 'glp' ? 'lpg' : 'gasolina'],
-          referenceGasolinePrice: nextCountryData.preciosDefecto.gasolina,
-          routeName: `Viaje en ${nextCountryData.nombre}`,
-        }));
+        setInputs((prev) => {
+          if (prev.country === c) return prev;
+          return {
+            ...prev,
+            country: c,
+            pricePerLiter: nextCountryData.preciosDefecto[prev.fuelType === 'diesel' ? 'diesel' : prev.fuelType === 'lpg' || prev.fuelType === 'glp' ? 'lpg' : 'gasolina'],
+            referenceGasolinePrice: nextCountryData.preciosDefecto.gasolina,
+            routeName: `Viaje en ${nextCountryData.nombre}`,
+          };
+        });
       }
     };
     window.addEventListener('litrometrik-country-changed', handleCountryEvt);
@@ -326,6 +329,7 @@ export default function App() {
             (prev.fuelType === 'diesel' && fuel === 'Diésel ON') ||
             ((prev.fuelType === 'lpg' || prev.fuelType === 'glp') && (fuel === 'Gas LPG' || fuel === 'Gas GLP / LPG'));
           if (isMatchingFuel) {
+            if (prev.pricePerLiter === price) return prev;
             return { ...prev, pricePerLiter: price };
           }
           return prev;

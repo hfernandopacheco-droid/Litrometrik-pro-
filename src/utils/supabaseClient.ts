@@ -428,22 +428,35 @@ export const subscribeToSupabaseAuth = (
   callback: (user: User | null, session: Session | null) => void
 ) => {
   if (!isSupabaseConfigured()) {
-    callback(null, null);
-    return () => {};
+    const timer = setTimeout(() => callback(null, null), 0);
+    return () => clearTimeout(timer);
   }
+
+  let lastUserId: string | null | undefined = undefined;
 
   // Initial check
   supabase.auth.getSession().then(({ data: { session } }) => {
-    callback(session?.user || null, session || null);
+    const currentId = session?.user?.id || null;
+    if (currentId !== lastUserId) {
+      lastUserId = currentId;
+      callback(session?.user || null, session || null);
+    }
   }).catch(() => {
-    callback(null, null);
+    if (lastUserId !== null) {
+      lastUserId = null;
+      callback(null, null);
+    }
   });
 
   try {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      callback(session?.user || null, session || null);
+      const currentId = session?.user?.id || null;
+      if (currentId !== lastUserId) {
+        lastUserId = currentId;
+        callback(session?.user || null, session || null);
+      }
     });
 
     return () => {

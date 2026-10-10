@@ -553,7 +553,6 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       localStorage.setItem('fuel_balance_pln', currentFuelBalance.toFixed(2));
       localStorage.setItem('currentFuelBalancePLN', currentFuelBalance.toFixed(2));
       localStorage.setItem('litrometrik_base_fuel_balance_pln', activeBaseBalance.toFixed(2));
-      window.dispatchEvent(new Event('fuel-storage-updated'));
     } catch (_) {}
   }, [fuelTanks, currentFuelBalance, activeBaseBalance, selectedCountry]);
 
@@ -714,36 +713,34 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     return [];
   });
 
-  // Sync price when country or activeFuel changes
-  useEffect(() => {
-    const p = defaultPrices[selectedCountry]?.[activeFuel] || 6.09;
-    setFuelPrice(p);
-  }, [selectedCountry, activeFuel]);
-
-  // Synchronize storage
+  // Synchronize storage from external tab updates
   useEffect(() => {
     const handleStorageSync = () => {
       try {
         const storedTanks = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
         if (storedTanks) {
-          setFuelTanks(JSON.parse(storedTanks));
+          setFuelTanks((prev) => {
+            if (JSON.stringify(prev) === storedTanks) return prev;
+            return JSON.parse(storedTanks);
+          });
         }
         const storedTrips = localStorage.getItem('historial_viajes');
         if (storedTrips) {
-          setHistorialViajes(JSON.parse(storedTrips));
+          setHistorialViajes((prev) => {
+            if (JSON.stringify(prev) === storedTrips) return prev;
+            return JSON.parse(storedTrips);
+          });
         }
       } catch (_) {}
     };
 
     window.addEventListener('storage', handleStorageSync);
-    window.addEventListener('fuel-storage-updated', handleStorageSync);
     window.addEventListener('litrometrik-records-updated', handleStorageSync);
     return () => {
       window.removeEventListener('storage', handleStorageSync);
-      window.removeEventListener('fuel-storage-updated', handleStorageSync);
       window.removeEventListener('litrometrik-records-updated', handleStorageSync);
     };
-  }, []);
+  }, [selectedCountry]);
 
   // Format MM:SS for Cronómetro
   const formatTime = (secs: number) => {

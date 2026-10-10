@@ -165,10 +165,10 @@ export const LiveRouteTelemetryMap: React.FC<LiveRouteTelemetryMapProps> = ({
     const pt = recordedWaypoints[0];
     if (pt) {
       reverseGeocodeLocation(pt.lat, pt.lng).then((addr) => {
-        setStartAddress(addr);
+        if (addr) setStartAddress(addr);
       });
     }
-  }, [recordedWaypoints]);
+  }, [recordedWaypoints[0]?.lat, recordedWaypoints[0]?.lng]);
 
   // Format MM:SS for Waypoint inspection
   const formatTime = (secs: number) => {
