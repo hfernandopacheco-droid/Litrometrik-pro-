@@ -422,49 +422,112 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const [currentSpeed, setCurrentSpeed] = useState<number>(0);
   const [currentGpsCoords, setCurrentGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // ---------------- TANK BALANCE & DEDUCTION ----------------
-  const [baseFuelBalance, setBaseFuelBalance] = useState<number>(() => {
+  // ---------------- MULTI-FUEL TANK BALANCE & DEDUCTION SYSTEM ----------------
+  const getDefaultTanks = (country: CountryCode, prices: Record<FuelKey, number>): FuelTankMap => {
+    const pLpg = prices['Gas LPG'] || defaultPrices[country]['Gas LPG'] || 2.89;
+    const pGas = prices['Gasolina Pb95'] || defaultPrices[country]['Gasolina Pb95'] || 6.09;
+    const pDie = prices['Diésel ON'] || defaultPrices[country]['Diésel ON'] || 6.15;
+    if (country === 'CO') {
+      return {
+        'Gasolina Pb95': { balance: 120000, liters: Math.round((120000 / pGas) * 100) / 100 },
+        'Gas LPG': { balance: 80000, liters: Math.round((80000 / pLpg) * 100) / 100 },
+        'Diésel ON': { balance: 130000, liters: Math.round((130000 / pDie) * 100) / 100 },
+      };
+    } else if (country === 'ES') {
+      return {
+        'Gasolina Pb95': { balance: 50.00, liters: Math.round((50 / pGas) * 100) / 100 },
+        'Gas LPG': { balance: 35.00, liters: Math.round((35 / pLpg) * 100) / 100 },
+        'Diésel ON': { balance: 55.00, liters: Math.round((55 / pDie) * 100) / 100 },
+      };
+    } else if (country === 'MX') {
+      return {
+        'Gasolina Pb95': { balance: 750.00, liters: Math.round((750 / pGas) * 100) / 100 },
+        'Gas LPG': { balance: 450.00, liters: Math.round((450 / pLpg) * 100) / 100 },
+        'Diésel ON': { balance: 800.00, liters: Math.round((800 / pDie) * 100) / 100 },
+      };
+    } else {
+      // PL
+      return {
+        'Gasolina Pb95': { balance: 150.00, liters: Math.round((150 / pGas) * 100) / 100 },
+        'Gas LPG': { balance: 114.38, liters: Math.round((114.38 / pLpg) * 100) / 100 },
+        'Diésel ON': { balance: 160.00, liters: Math.round((160 / pDie) * 100) / 100 },
+      };
+    }
+  };
+
+  const [fuelTanks, setFuelTanks] = useState<FuelTankMap>(() => {
     try {
-      const storedBase = localStorage.getItem('litrometrik_base_fuel_balance_pln');
-      if (storedBase !== null) {
-        const val = parseFloat(storedBase);
-        if (!isNaN(val)) return val;
+      const stored = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const def = getDefaultTanks(selectedCountry, defaultPrices[selectedCountry]);
+        return {
+          'Gasolina Pb95': parsed['Gasolina Pb95'] || def['Gasolina Pb95'],
+          'Gas LPG': parsed['Gas LPG'] || parsed['Gas GLP / LPG'] || def['Gas LPG'],
+          'Diésel ON': parsed['Diésel ON'] || def['Diésel ON'],
+        };
       }
-      const stored =
+      // Check legacy single-tank balance
+      const legacyBal = parseFloat(
+        localStorage.getItem('litrometrik_base_fuel_balance_pln') ||
         localStorage.getItem('litrometrik_fuel_balance_pln') ||
-        localStorage.getItem('fuel_balance_pln') ||
-        localStorage.getItem('currentFuelBalancePLN');
-      if (stored !== null) {
-        const val = parseFloat(stored);
-        if (!isNaN(val)) return val;
+        '114.38'
+      );
+      const def = getDefaultTanks(selectedCountry, defaultPrices[selectedCountry]);
+      if (!isNaN(legacyBal) && legacyBal > 0) {
+        def['Gas LPG'].balance = legacyBal;
       }
+      return def;
     } catch (_) {}
-    return 114.38;
+    return getDefaultTanks(selectedCountry, defaultPrices[selectedCountry]);
   });
 
-  // Reactive Tank Deductions (No negative numbers)
-  const currentFuelBalance = useMemo(() => {
-    return Math.max(0, Math.round((baseFuelBalance - liveCost) * 100) / 100);
-  }, [baseFuelBalance, liveCost]);
+  // Re-sync tanks when country changes
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const def = getDefaultTanks(selectedCountry, fuelPrices);
+        setFuelTanks({
+          'Gasolina Pb95': parsed['Gasolina Pb95'] || def['Gasolina Pb95'],
+          'Gas LPG': parsed['Gas LPG'] || parsed['Gas GLP / LPG'] || def['Gas LPG'],
+          'Diésel ON': parsed['Diésel ON'] || def['Diésel ON'],
+        });
+      } else {
+        setFuelTanks(getDefaultTanks(selectedCountry, fuelPrices));
+      }
+    } catch (_) {}
+  }, [selectedCountry]);
 
-  const baseTankVolumeLiters = useMemo(() => {
-    return fuelPrice > 0 ? baseFuelBalance / fuelPrice : 0;
-  }, [baseFuelBalance, fuelPrice]);
+  // Reactive Tank Deductions for active fuel (No negative numbers)
+  const activeBaseBalance = fuelTanks[activeFuel]?.balance ?? 114.38;
+  const currentFuelBalance = useMemo(() => {
+    return Math.max(0, Math.round((activeBaseBalance - liveCost) * 100) / 100);
+  }, [activeBaseBalance, liveCost]);
+
+  const activeTankVolumeLiters = useMemo(() => {
+    const tankLit = fuelTanks[activeFuel]?.liters;
+    if (typeof tankLit === 'number' && tankLit > 0) {
+      return tankLit;
+    }
+    return fuelPrice > 0 ? activeBaseBalance / fuelPrice : 0;
+  }, [fuelTanks, activeFuel, activeBaseBalance, fuelPrice]);
 
   const currentRemainingLiters = useMemo(() => {
-    return Math.max(0, Math.round((baseTankVolumeLiters - liveLiters) * 100) / 100);
-  }, [baseTankVolumeLiters, liveLiters]);
+    return Math.max(0, Math.round((activeTankVolumeLiters - liveLiters) * 100) / 100);
+  }, [activeTankVolumeLiters, liveLiters]);
 
-  // Dynamic Fuel Tank Reserve Alert (< 15% volume or <= 30 PLN)
+  // Dynamic Fuel Tank Reserve Alert (< 15% volume or <= 30 PLN / proportional)
   const tankCapacity = 50;
   const isReserveActive = useMemo(() => {
     return (
-      currentFuelBalance <= 30 ||
+      currentFuelBalance <= (selectedCountry === 'CO' ? 25000 : selectedCountry === 'MX' ? 100 : 30) ||
       currentRemainingLiters <= tankCapacity * 0.15 ||
       currentFuelBalance === 0 ||
       currentRemainingLiters === 0
     );
-  }, [currentFuelBalance, currentRemainingLiters]);
+  }, [currentFuelBalance, currentRemainingLiters, selectedCountry]);
 
   // Haptic feedback when entering fuel reserve
   const lastReserveHapticRef = useRef<number>(0);
@@ -482,16 +545,17 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     }
   }, [isReserveActive, isRunning]);
 
-  // Sync discounted balance to localStorage
+  // Sync discounted balance and tanks map to localStorage
   useEffect(() => {
     try {
+      localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(fuelTanks));
       localStorage.setItem('litrometrik_fuel_balance_pln', currentFuelBalance.toFixed(2));
       localStorage.setItem('fuel_balance_pln', currentFuelBalance.toFixed(2));
       localStorage.setItem('currentFuelBalancePLN', currentFuelBalance.toFixed(2));
-      localStorage.setItem('litrometrik_base_fuel_balance_pln', baseFuelBalance.toFixed(2));
+      localStorage.setItem('litrometrik_base_fuel_balance_pln', activeBaseBalance.toFixed(2));
       window.dispatchEvent(new Event('fuel-storage-updated'));
     } catch (_) {}
-  }, [currentFuelBalance, baseFuelBalance]);
+  }, [fuelTanks, currentFuelBalance, activeBaseBalance, selectedCountry]);
 
   // Initialize GPS on mount
   useEffect(() => {
@@ -660,10 +724,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   useEffect(() => {
     const handleStorageSync = () => {
       try {
-        const storedBase = localStorage.getItem('litrometrik_base_fuel_balance_pln');
-        if (storedBase !== null) {
-          const val = parseFloat(storedBase);
-          if (!isNaN(val)) setBaseFuelBalance(val);
+        const storedTanks = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
+        if (storedTanks) {
+          setFuelTanks(JSON.parse(storedTanks));
         }
         const storedTrips = localStorage.getItem('historial_viajes');
         if (storedTrips) {
@@ -779,7 +842,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
     const speed = currentSpeedRef.current;
     const isIdle = speed < 3;
-    const isLpg = activeFuelRef.current === 'Gas GLP / LPG';
+    const isLpg = activeFuelRef.current === 'Gas LPG';
     const isDiesel = activeFuelRef.current === 'Diésel ON';
     const isAC = isACActiveRef.current;
 
@@ -980,7 +1043,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   // Dynamic consumption factor based on selected vehicle, engine, transmission, fuel and A/C
                   const transMult = transmissionRef.current === 'automatic' ? 1.08 : 1.0;
                   const fuelMult =
-                    activeFuelRef.current === 'Gas GLP / LPG' ? 1.20 :
+                    activeFuelRef.current === 'Gas LPG' ? 1.20 :
                     activeFuelRef.current === 'Diésel ON' ? 0.85 : 1.0;
                   const acAdd = isACActiveRef.current ? acAddonAmountRef.current : 0.0;
                   const currentRateL100 = (baseConsumptionL100Ref.current * transMult * fuelMult) + acAdd;
@@ -1033,9 +1096,21 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try { navigator.vibrate(14); } catch (_) {}
     }
-    setBaseFuelBalance(currentFuelBalance);
-    localStorage.setItem('litrometrik_base_fuel_balance_pln', currentFuelBalance.toString());
-    localStorage.setItem('litrometrik_fuel_balance_pln', currentFuelBalance.toString());
+    setFuelTanks((prev) => {
+      const cur = prev[activeFuel] || { balance: 0, liters: 0 };
+      const updated = {
+        ...prev,
+        [activeFuel]: { ...cur, balance: currentFuelBalance, liters: currentRemainingLiters },
+      };
+      try {
+        localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+    try {
+      localStorage.setItem('litrometrik_base_fuel_balance_pln', currentFuelBalance.toString());
+      localStorage.setItem('litrometrik_fuel_balance_pln', currentFuelBalance.toString());
+    } catch (_) {}
 
     setDistanceKm(0);
     setLiveLiters(0);
@@ -1081,9 +1156,21 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     };
 
     const updatedBalance = currentFuelBalance;
-    setBaseFuelBalance(updatedBalance);
-    localStorage.setItem('litrometrik_base_fuel_balance_pln', updatedBalance.toString());
-    localStorage.setItem('litrometrik_fuel_balance_pln', updatedBalance.toString());
+    setFuelTanks((prev) => {
+      const cur = prev[activeFuel] || { balance: 0, liters: 0 };
+      const updated = {
+        ...prev,
+        [activeFuel]: { ...cur, balance: updatedBalance, liters: currentRemainingLiters },
+      };
+      try {
+        localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+    try {
+      localStorage.setItem('litrometrik_base_fuel_balance_pln', updatedBalance.toString());
+      localStorage.setItem('litrometrik_fuel_balance_pln', updatedBalance.toString());
+    } catch (_) {}
 
     const updatedTrips = [tripRecord, ...historialViajes];
     setHistorialViajes(updatedTrips);
@@ -1110,7 +1197,44 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // ---------------- INTERACTIVE FUEL SWITCH ENGINE (With GLP/Gasolina Prompt) ----------------
+  // ---------------- INTERACTIVE FUEL SWITCH ENGINE & DEDICATED TANK SYNC ----------------
+  const handleSwitchFuel = (targetFuel: FuelKey) => {
+    if (targetFuel === activeFuel) return;
+
+    // Deduct accumulated cost and liters from the previous fuel's tank
+    if (liveCost > 0 || liveLiters > 0) {
+      setFuelTanks((prev) => {
+        const cur = prev[activeFuel] || { balance: 0, liters: 0 };
+        const newBal = Math.max(0, Math.round((cur.balance - liveCost) * 100) / 100);
+        const newLit = Math.max(0, Math.round(((cur.liters || (fuelPrice > 0 ? cur.balance / fuelPrice : 0)) - liveLiters) * 100) / 100);
+        const updated = {
+          ...prev,
+          [activeFuel]: { ...cur, balance: newBal, liters: newLit },
+        };
+        try {
+          localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
+      });
+      setLiveCost(0);
+      setLiveLiters(0);
+    }
+
+    setActiveFuel(targetFuel);
+    activeFuelRef.current = targetFuel;
+    const p = fuelPrices[targetFuel] || defaultPrices[selectedCountry]?.[targetFuel] || 2.89;
+    setFuelPrice(p);
+    fuelPriceRef.current = p;
+    try {
+      localStorage.setItem('litrometrik_active_fuel', targetFuel);
+      localStorage.setItem('fuel_price_per_liter', p.toString());
+    } catch (_) {}
+
+    const shortLabel = targetFuel === 'Gas LPG' ? 'LPG' : targetFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina';
+    setNotification(`⛽ Conmutado a ${shortLabel} (${p.toFixed(2)} ${currency}/L) • Tanque y telemetría sincronizados`);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
   const initiateFuelChange = (targetFuel: FuelKey) => {
     if (targetFuel === activeFuel) {
       setShowFuelPickerModal(false);
@@ -1126,14 +1250,30 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     if (distanceKm > 0.05 || liveLiters > 0.01) {
       setShowSaveSegmentConfirmModal(true);
     } else {
-      // Direct switch
       finalizeFuelChange(targetFuel, currentSavedPrice, false);
     }
   };
 
   const finalizeFuelChange = (targetFuel: FuelKey, priceVal: number, saveOldSegment: boolean) => {
     if (saveOldSegment) {
-      handleSaveTrip(`Tramo previo con ${activeFuel} (${distanceKm.toFixed(1)} km)`);
+      handleSaveTrip(`Tramo previo con ${activeFuel === 'Gas LPG' ? 'LPG' : activeFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina'} (${distanceKm.toFixed(1)} km)`);
+    } else if (liveCost > 0 || liveLiters > 0) {
+      // Deduct from previous fuel's tank
+      setFuelTanks((prev) => {
+        const cur = prev[activeFuel] || { balance: 0, liters: 0 };
+        const newBal = Math.max(0, Math.round((cur.balance - liveCost) * 100) / 100);
+        const newLit = Math.max(0, Math.round(((cur.liters || (fuelPrice > 0 ? cur.balance / fuelPrice : 0)) - liveLiters) * 100) / 100);
+        const updated = {
+          ...prev,
+          [activeFuel]: { ...cur, balance: newBal, liters: newLit },
+        };
+        try {
+          localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
+      });
+      setLiveCost(0);
+      setLiveLiters(0);
     }
 
     setActiveFuel(targetFuel);
@@ -1142,16 +1282,14 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
     try {
       localStorage.setItem('litrometrik_active_fuel', targetFuel);
+      localStorage.setItem('fuel_price_per_liter', priceVal.toString());
     } catch (_) {}
 
     setShowSaveSegmentConfirmModal(false);
     setPendingFuelTarget(null);
 
-    setNotification(
-      targetFuel === 'Gas GLP / LPG'
-        ? `🔥 Conmutado a GLP (${priceVal.toFixed(2)} ${currency}/L) • Algoritmo y tanque sincronizados`
-        : `⛽ Conmutado a ${targetFuel} (${priceVal.toFixed(2)} ${currency}/L) • Algoritmo y tanque sincronizados`
-    );
+    const shortLabel = targetFuel === 'Gas LPG' ? 'LPG' : targetFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina';
+    setNotification(`⛽ Conmutado a ${shortLabel} (${priceVal.toFixed(2)} ${currency}/L) • Algoritmo y tanque sincronizados`);
     setTimeout(() => setNotification(null), 3500);
   };
 
@@ -1175,39 +1313,62 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // ---------------- TANK REFUEL & ADJUST ----------------
+  // ---------------- TANK REFUEL & ADJUST (PER-FUEL TANK SYNC) ----------------
   const handleSaveRefuel = () => {
     const amount = parseFloat(refuelAmountInput.replace(',', '.'));
     const enteredPrice = parseFloat(refuelPriceInput.replace(',', '.'));
+    const targetFuelKey = (refuelFuelType as FuelKey) || activeFuel;
     const finalPrice = !isNaN(enteredPrice) && enteredPrice > 0
       ? Math.round(enteredPrice * 100) / 100
-      : (fuelPrices[refuelFuelType] || fuelPrice);
+      : (fuelPrices[targetFuelKey] || fuelPrice);
 
     if (isNaN(amount) || amount <= 0) return;
 
     // 1. Actualización global del precio para ese tipo de combustible
-    updateGlobalFuelPrice(refuelFuelType, finalPrice);
+    updateGlobalFuelPrice(targetFuelKey, finalPrice);
 
     // Si coincide con el combustible activo del viaje, actualizarlo en vivo
-    if (refuelFuelType === activeFuel) {
+    if (targetFuelKey === activeFuel) {
       setFuelPrice(finalPrice);
     }
 
     const addedLiters = finalPrice > 0 ? Math.round((amount / finalPrice) * 100) / 100 : 0;
-    const newBase = Math.round((baseFuelBalance + amount) * 100) / 100;
-    setBaseFuelBalance(newBase);
+
+    // 2. Guardar en el tanque correspondiente a ese combustible en fuelTanks
+    setFuelTanks((prev) => {
+      const prevTank = prev[targetFuelKey] || { balance: 0, liters: 0 };
+      const nextBal = Math.round((prevTank.balance + amount) * 100) / 100;
+      const nextLit = Math.round(((prevTank.liters || (finalPrice > 0 ? prevTank.balance / finalPrice : 0)) + addedLiters) * 100) / 100;
+      const nextMap: FuelTankMap = {
+        ...prev,
+        [targetFuelKey]: {
+          balance: nextBal,
+          liters: nextLit,
+          lastRefuelAmount: amount,
+          lastRefuelPrice: finalPrice,
+          lastRefuelDate: new Date().toISOString(),
+        },
+      };
+      try {
+        localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(nextMap));
+        if (targetFuelKey === activeFuel) {
+          localStorage.setItem('litrometrik_base_fuel_balance_pln', nextBal.toString());
+          localStorage.setItem('litrometrik_fuel_balance_pln', Math.max(0, nextBal - liveCost).toFixed(2));
+          localStorage.setItem('fuel_balance_pln', Math.max(0, nextBal - liveCost).toFixed(2));
+          localStorage.setItem('currentFuelBalancePLN', Math.max(0, nextBal - liveCost).toFixed(2));
+        }
+      } catch (_) {}
+      return nextMap;
+    });
 
     try {
-      localStorage.setItem('litrometrik_base_fuel_balance_pln', newBase.toString());
-      localStorage.setItem('litrometrik_fuel_balance_pln', Math.max(0, newBase - liveCost).toFixed(2));
-      localStorage.setItem('fuel_balance_pln', Math.max(0, newBase - liveCost).toFixed(2));
-      localStorage.setItem('currentFuelBalancePLN', Math.max(0, newBase - liveCost).toFixed(2));
-
       const uid = currentUser?.uid || 'guest';
       const repostajesKey = `litrometrik_${uid}_repostajes`;
       const refuels = JSON.parse(localStorage.getItem(repostajesKey) || '[]');
       const defaultStation =
         selectedCountry === 'PL' ? 'Orlen' : selectedCountry === 'CO' ? 'Terpel' : selectedCountry === 'ES' ? 'Repsol' : 'Pemex';
+
+      const shortName = targetFuelKey === 'Gas LPG' ? 'LPG' : targetFuelKey === 'Diésel ON' ? 'Diésel' : 'Gasolina';
 
       const newRefuelEntry = {
         id: `rec_refuel_${Date.now()}`,
@@ -1218,9 +1379,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         moneda: currency,
         odometer: 145500 + Math.round(distanceKm),
         cost: amount,
-        title: `Repostaje ${refuelFuelType}`,
+        title: `Repostaje ${shortName}`,
         station: defaultStation,
-        fuelType: refuelFuelType,
+        fuelType: targetFuelKey,
         liters: addedLiters,
         pricePerLiter: finalPrice,
         kmSinceLastRefuel: Math.round(distanceKm || 320),
@@ -1234,9 +1395,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       if (uid && uid !== 'guest' && uid !== 'guest_user') {
         saveCloudRecord(uid, 'repostajes', newRefuelEntry);
         saveCloudVehicleConfig(uid, {
-          fuelBalance: Math.max(0, newBase - liveCost),
+          fuelBalance: Math.max(0, (fuelTanks[targetFuelKey]?.balance || 0) + amount - (targetFuelKey === activeFuel ? liveCost : 0)),
           fuelPricePerLiter: finalPrice,
-          lastFuelType: refuelFuelType,
+          lastFuelType: targetFuelKey,
         });
       }
 
@@ -1247,7 +1408,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
     setShowRefuelModal(false);
     setRefuelAmountInput('');
-    setNotification(`⛽ ¡Tanque recargado con +${amount} ${currency} (${refuelFuelType})! (+${addedLiters.toFixed(2)} L @ ${finalPrice.toFixed(2)}/L)`);
+    const shortName = targetFuelKey === 'Gas LPG' ? 'LPG' : targetFuelKey === 'Diésel ON' ? 'Diésel' : 'Gasolina';
+    setNotification(`⛽ ¡Tanque de ${shortName} recargado con +${amount} ${currency}! (+${addedLiters.toFixed(2)} L @ ${finalPrice.toFixed(2)}/L)`);
     setTimeout(() => setNotification(null), 3500);
   };
 
@@ -1261,12 +1423,28 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     }
 
     const clampedTarget = Math.max(0, Math.round(targetBal * 100) / 100);
-    const newBase = Math.round((clampedTarget + liveCost) * 100) / 100;
-    setBaseFuelBalance(newBase);
+    const newLiters = fuelPrice > 0 ? Math.round((clampedTarget / fuelPrice) * 100) / 100 : 0;
 
-    localStorage.setItem('litrometrik_base_fuel_balance_pln', newBase.toString());
-    localStorage.setItem('litrometrik_fuel_balance_pln', clampedTarget.toString());
-    localStorage.setItem('fuel_balance_pln', clampedTarget.toString());
+    setFuelTanks((prev) => {
+      const updated: FuelTankMap = {
+        ...prev,
+        [activeFuel]: {
+          ...prev[activeFuel],
+          balance: clampedTarget,
+          liters: newLiters,
+        },
+      };
+      try {
+        localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
+        localStorage.setItem('litrometrik_base_fuel_balance_pln', clampedTarget.toString());
+        localStorage.setItem('litrometrik_fuel_balance_pln', clampedTarget.toString());
+        localStorage.setItem('fuel_balance_pln', clampedTarget.toString());
+      } catch (_) {}
+      return updated;
+    });
+
+    setLiveCost(0);
+    setLiveLiters(0);
 
     const uid = currentUser?.uid;
     if (uid && uid !== 'guest' && uid !== 'guest_user') {
@@ -1277,23 +1455,40 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     window.dispatchEvent(new Event('storage'));
 
     setShowAdjustModal(false);
-    setNotification(`⛽ Saldo del tanque ajustado a ${clampedTarget.toFixed(2)} ${currency}`);
+    const shortName = activeFuel === 'Gas LPG' ? 'LPG' : activeFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina';
+    setNotification(`⛽ Saldo del tanque de ${shortName} ajustado a ${clampedTarget.toFixed(2)} ${currency}`);
     setTimeout(() => setNotification(null), 3000);
   };
 
   const handleResetZero = () => {
-    if (window.confirm('¿Seguro que deseas restablecer el saldo del tanque a 0,00?')) {
-      setBaseFuelBalance(liveCost);
-      localStorage.setItem('litrometrik_base_fuel_balance_pln', liveCost.toString());
-      localStorage.setItem('litrometrik_fuel_balance_pln', '0');
-      localStorage.setItem('fuel_balance_pln', '0');
+    const shortName = activeFuel === 'Gas LPG' ? 'LPG' : activeFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina';
+    if (window.confirm(`¿Seguro que deseas restablecer el saldo del tanque de ${shortName} a 0,00?`)) {
+      setFuelTanks((prev) => {
+        const updated: FuelTankMap = {
+          ...prev,
+          [activeFuel]: {
+            ...prev[activeFuel],
+            balance: 0,
+            liters: 0,
+          },
+        };
+        try {
+          localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
+          localStorage.setItem('litrometrik_base_fuel_balance_pln', '0');
+          localStorage.setItem('litrometrik_fuel_balance_pln', '0');
+          localStorage.setItem('fuel_balance_pln', '0');
+        } catch (_) {}
+        return updated;
+      });
+      setLiveCost(0);
+      setLiveLiters(0);
       const uid = currentUser?.uid;
       if (uid && uid !== 'guest' && uid !== 'guest_user') {
         saveCloudVehicleConfig(uid, { fuelBalance: 0 });
       }
       window.dispatchEvent(new Event('fuel-storage-updated'));
       window.dispatchEvent(new Event('storage'));
-      setNotification('⛽ Saldo de tanque restablecido a 0,00');
+      setNotification(`⛽ Saldo del tanque de ${shortName} restablecido a 0,00`);
       setTimeout(() => setNotification(null), 3000);
     }
   };
@@ -1669,7 +1864,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             </div>
 
             {/* Campo 2: CONSUMO EN VIVO (Top-Right) */}
-            <div className="relative min-h-[126px] sm:min-h-[136px] p-4 sm:p-5 rounded-tr-[34px] rounded-tl-2xl rounded-br-2xl rounded-bl-[52px] bg-[#121620]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between text-right overflow-hidden">
+            <div className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-tr-[34px] rounded-tl-2xl rounded-br-2xl rounded-bl-[52px] bg-[#121620]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between text-right overflow-hidden">
               <div>
                 <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase block">
                   CONSUMO EN VIVO
@@ -1683,12 +1878,12 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   currentSpeed < 3 ? (
                     <span className="text-[10px] sm:text-[11px] text-amber-400 font-bold flex items-center space-x-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                      <span>En Ralentí ({activeFuel === 'Gas GLP / LPG' ? (isACActive ? '1,15' : '0,95') : (isACActive ? '1,00' : '0,80')} L/h)</span>
+                      <span>En Ralentí ({activeFuel === 'Gas LPG' ? (isACActive ? '1,15' : '0,95') : (isACActive ? '1,00' : '0,80')} L/h)</span>
                     </span>
                   ) : (
                     <span className="text-[10px] sm:text-[11px] text-emerald-400 font-bold flex items-center space-x-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      <span>En Movimiento ({((baseConsumptionL100 * (transmission === 'automatic' ? 1.08 : 1.0) * (activeFuel === 'Gas GLP / LPG' ? 1.2 : 1.0)) + (isACActive ? acAddonAmount : 0)).toFixed(1)} L/100km)</span>
+                      <span>En Movimiento ({((baseConsumptionL100 * (transmission === 'automatic' ? 1.08 : 1.0) * (activeFuel === 'Gas LPG' ? 1.2 : 1.0)) + (isACActive ? acAddonAmount : 0)).toFixed(1)} L/100km)</span>
                     </span>
                   )
                 ) : (
@@ -1699,43 +1894,92 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* Campo 3: GASTO EN VIVO (Bottom-Left) con BOTÓN INTERACTIVO para cambiar combustible */}
-            <div className="relative min-h-[126px] sm:min-h-[136px] p-4 sm:p-5 rounded-bl-[34px] rounded-br-2xl rounded-tl-2xl rounded-tr-[52px] bg-[#121620]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between overflow-hidden">
-              <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase">
-                GASTO EN VIVO
-              </span>
+            {/* Campo 3: GASTO EN VIVO (Bottom-Left) con SELECTOR DE 3 COMBUSTIBLES Y SU PANEL DE SALDO DE TANQUE */}
+            <div className="relative min-h-[142px] sm:min-h-[148px] p-3 sm:p-3.5 rounded-bl-[32px] rounded-br-2xl rounded-tl-2xl rounded-tr-[42px] bg-[#121620]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase">
+                  GASTO EN VIVO
+                </span>
+                <span className="text-[10px] font-mono font-bold text-amber-300">
+                  {fuelPrices[activeFuel]?.toFixed(2)} {currency}/L
+                </span>
+              </div>
+
               <div>
                 <div className="text-2xl sm:text-3xl font-black font-sans text-[#FF4F00] tracking-tight">
                   {liveCost.toFixed(2).replace('.', ',')} <span className="text-xs font-bold">{currency}</span>
                 </div>
 
-                {/* BOTÓN INTERACTIVO BONITO (Imagen 3) */}
-                <button
-                  type="button"
-                  onClick={() => setShowFuelPickerModal(true)}
-                  className="mt-1 inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#FF4F00]/25 to-[#FF6B00]/15 hover:from-[#FF4F00]/40 hover:to-[#FF6B00]/30 border border-[#FF4F00]/50 text-white text-[11px] font-black transition-all active:scale-95 cursor-pointer shadow-sm group"
-                  title="Toca para cambiar de combustible (Gasolina / GLP / Diésel)"
-                >
-                  <Fuel className="w-3.5 h-3.5 text-[#FF4F00] group-hover:rotate-12 transition-transform shrink-0" />
-                  <span className="truncate">{activeFuel}</span>
-                  <ChevronDown className="w-3 h-3 text-[#FF4F00] shrink-0" />
-                </button>
+                {/* SELECTOR INTERACTIVO DIRECTO DE 3 COMBUSTIBLES (LPG / Gasolina / Diésel) */}
+                <div className="grid grid-cols-3 gap-1 mt-1.5">
+                  {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((fKey) => {
+                    const isSel = activeFuel === fKey;
+                    const shortLabel = fKey === 'Gas LPG' ? 'LPG' : fKey === 'Diésel ON' ? 'Diésel' : 'Gasolina';
+                    const icon = fKey === 'Gas LPG' ? '🔥' : fKey === 'Diésel ON' ? '🛢️' : '⛽';
+                    return (
+                      <button
+                        key={fKey}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSwitchFuel(fKey);
+                        }}
+                        className={`py-1 px-1 rounded-xl text-[10px] font-black transition-all flex items-center justify-center space-x-1 cursor-pointer active:scale-95 ${
+                          isSel
+                            ? 'bg-[#FF4F00] text-white shadow-sm shadow-[#FF4F00]/40 ring-1 ring-white/20'
+                            : 'bg-[#182030] hover:bg-[#20293D] text-slate-300 border border-slate-700/60'
+                        }`}
+                        title={`Seleccionar combustible ${shortLabel}`}
+                      >
+                        <span className="text-xs">{icon}</span>
+                        <span className="truncate">{shortLabel}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Panel de saldo restante en tanque para el combustible seleccionado */}
+                <div className="mt-1.5 p-1 rounded-lg bg-black/40 border border-slate-800/80 flex items-center justify-between text-[9px] sm:text-[10px]">
+                  <div className="flex items-center space-x-1 min-w-0">
+                    <span className="text-slate-400 font-bold truncate">
+                      Tanque {activeFuel === 'Gas LPG' ? 'LPG' : activeFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina'}:
+                    </span>
+                    <span className="font-mono font-black text-amber-300 truncate">
+                      {currentFuelBalance.toFixed(1).replace('.', ',')} {currency} ({currentRemainingLiters.toFixed(1)}L)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRefuelFuelType(activeFuel);
+                      const p = fuelPrices[activeFuel] || fuelPrice;
+                      setRefuelAmountInput('');
+                      setRefuelPriceInput(p.toFixed(2));
+                      setShowRefuelModal(true);
+                    }}
+                    className="ml-1 px-1.5 py-0.5 rounded-md bg-[#FF4F00]/20 hover:bg-[#FF4F00]/30 text-[#FF4F00] font-bold text-[8px] sm:text-[9px] border border-[#FF4F00]/40 shrink-0 cursor-pointer transition active:scale-95"
+                    title="Registrar tanqueo para este combustible"
+                  >
+                    + Tanqueo
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) - Letras perfectamente cuadradas y visibles */}
+            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) - Letras perfectamente encajadas y 100% visibles */}
             <div
               onClick={toggleAC}
-              className={`relative min-h-[126px] sm:min-h-[136px] p-4 sm:p-5 rounded-br-[34px] rounded-bl-2xl rounded-tr-2xl rounded-tl-[52px] border transition-all duration-300 flex flex-col justify-between text-right cursor-pointer select-none overflow-hidden ${
+              className={`relative min-h-[142px] sm:min-h-[148px] p-3 sm:p-3.5 rounded-br-[32px] rounded-bl-2xl rounded-tr-2xl rounded-tl-[42px] border transition-all duration-300 flex flex-col justify-between text-right cursor-pointer select-none overflow-hidden ${
                 isACActive
                   ? 'bg-gradient-to-br from-[#0B2138] via-[#0A1A2C] to-[#121620] border-cyan-400/80 shadow-[0_0_30px_rgba(0,212,255,0.25)] ring-1 ring-cyan-400/30'
                   : 'bg-[#121620]/95 border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700'
               }`}
             >
-              {/* Header alineado a la derecha para no quedar cubierto por el velocímetro */}
-              <div className="flex items-center justify-end space-x-2 pl-4">
+              {/* Header con Aire A/C a la izquierda y Switch a la derecha: completamente visible sin recortes */}
+              <div className="flex items-center justify-between w-full gap-1">
                 <span
-                  className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-black tracking-wider uppercase transition-all shadow-sm ${
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xl border text-[10px] sm:text-[11px] font-black tracking-wide uppercase transition-all shadow-sm shrink-0 whitespace-nowrap ${
                     isACActive
                       ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-cyan-500/20'
                       : 'bg-slate-800/90 border-slate-700/80 text-slate-300'
@@ -1746,16 +1990,16 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                       isACActive ? 'text-cyan-300 animate-spin' : 'text-slate-400'
                     }`}
                   />
-                  <span className="font-black whitespace-nowrap">Aire A/C 💨</span>
+                  <span className="font-black">Aire A/C</span>
                 </span>
 
                 {/* Tactile Switch Toggle */}
                 <div
-                  className={`w-10 h-5.5 rounded-full transition-colors flex items-center px-0.5 shadow-inner shrink-0 ${
+                  className={`w-8 h-4.5 rounded-full transition-colors flex items-center px-0.5 shadow-inner shrink-0 ${
                     isACActive ? 'bg-[#00D4FF] justify-end' : 'bg-slate-700 justify-start'
                   }`}
                 >
-                  <div className="w-4.5 h-4.5 rounded-full bg-white shadow-md transform transition-transform" />
+                  <div className="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform" />
                 </div>
               </div>
 
@@ -1773,11 +2017,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   <span className="text-xs font-bold text-slate-400">L/100km</span>
                 </div>
                 <p
-                  className={`text-[10px] sm:text-[11px] font-bold mt-0.5 truncate ${
+                  className={`text-[10px] sm:text-[11px] font-bold mt-0.5 truncate text-right ${
                     isACActive ? 'text-cyan-300' : 'text-slate-500'
                   }`}
                 >
-                  {isACActive ? 'A/C Encendido (+0.6)' : 'A/C Apagado (Modo Eco)'}
+                  {isACActive ? 'Aire A/C (+0.6 L/100)' : 'Aire A/C Apagado'}
                 </p>
               </div>
             </div>
@@ -1938,34 +2182,68 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               : 'bg-[#121620] border border-slate-800/80'
           }`}
         >
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center space-x-2">
+          {/* Header con tabs para cambiar entre Gasolina, LPG o Diésel y ver el saldo de cada uno */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-[11px] font-black tracking-widest text-slate-400 uppercase">
                 SALDO RESTANTE EN TANQUE
               </span>
-              {isReserveActive && (
-                <span className="flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-red-500/20 border border-red-500/60 text-[10px] font-black text-red-400 uppercase tracking-wide animate-pulse">
-                  <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
-                  <span>Nivel de Combustible Bajo / Reserva</span>
-                </span>
-              )}
+              <div className="flex items-center space-x-1 px-3 py-1 rounded-full bg-[#1A202C] border border-slate-700/80 text-xs font-sans font-bold text-slate-200">
+                <span>💧</span>
+                <span>{currentRemainingLiters.toFixed(2).replace('.', ',')} L</span>
+              </div>
             </div>
-            <div className="flex items-center space-x-1 px-3 py-1 rounded-full bg-[#1A202C] border border-slate-700/80 text-xs font-sans font-bold text-slate-200">
-              <span>💧</span>
-              <span>{currentRemainingLiters.toFixed(2).replace('.', ',')} L</span>
+
+            {/* Pestañas de combustible con su saldo individual guardado */}
+            <div className="grid grid-cols-3 gap-2">
+              {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((fKey) => {
+                const isCurrent = activeFuel === fKey;
+                const shortLabel = fKey === 'Gas LPG' ? 'LPG' : fKey === 'Diésel ON' ? 'Diésel' : 'Gasolina';
+                const icon = fKey === 'Gas LPG' ? '🔥' : fKey === 'Diésel ON' ? '🛢️' : '⛽';
+                const tankVal = isCurrent ? currentFuelBalance : (fuelTanks[fKey]?.balance || 0);
+                return (
+                  <button
+                    key={fKey}
+                    type="button"
+                    onClick={() => handleSwitchFuel(fKey)}
+                    className={`p-2 rounded-2xl border text-center transition flex flex-col items-center justify-center cursor-pointer active:scale-95 ${
+                      isCurrent
+                        ? 'bg-[#FF4F00]/20 border-[#FF4F00] text-white shadow-md shadow-[#FF4F00]/25 ring-1 ring-[#FF4F00]'
+                        : 'bg-[#182030] border-slate-700/70 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span className="text-sm">{icon}</span>
+                      <span className="text-xs font-black truncate">{shortLabel}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-amber-300 font-bold mt-0.5">
+                      {tankVal.toFixed(0)} {currency}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Giant Amount - Orange or Glowing Red if in Reserve */}
-          <div
-            className={`text-4xl sm:text-5xl font-black font-sans tracking-tight transition-colors ${
-              isReserveActive
-                ? 'text-red-400 drop-shadow-[0_0_15px_rgba(239,68,68,0.6)]'
-                : 'text-[#FF4F00]'
-            }`}
-          >
-            {currentFuelBalance.toFixed(2).replace('.', ',')}{' '}
-            <span className="text-2xl font-bold uppercase">{currency}</span>
+          <div className="flex items-baseline justify-between">
+            <div
+              className={`text-4xl sm:text-5xl font-black font-sans tracking-tight transition-colors ${
+                isReserveActive
+                  ? 'text-red-400 drop-shadow-[0_0_15px_rgba(239,68,68,0.6)]'
+                  : 'text-[#FF4F00]'
+              }`}
+            >
+              {currentFuelBalance.toFixed(2).replace('.', ',')}{' '}
+              <span className="text-2xl font-bold uppercase">{currency}</span>
+            </div>
+
+            {isReserveActive && (
+              <span className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-red-500/20 border border-red-500/60 text-[10px] font-black text-red-400 uppercase tracking-wide animate-pulse">
+                <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
+                <span>Reserva</span>
+              </span>
+            )}
           </div>
 
           {/* Big Orange Button: + Registrar Tanqueo */}
@@ -1981,7 +2259,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             className="w-full py-3.5 rounded-2xl bg-[#FF4F00] hover:bg-[#FF621F] text-white font-black text-sm transition-all duration-150 active:scale-[0.98] cursor-pointer shadow-lg shadow-[#FF4F00]/30 flex items-center justify-center space-x-2"
           >
             <Plus className="w-5 h-5 stroke-[2.5]" />
-            <span>Registrar Tanqueo</span>
+            <span>Registrar Tanqueo ({activeFuel === 'Gas LPG' ? 'LPG' : activeFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina'})</span>
           </button>
 
           {/* Secondary Buttons Row: [ Ajustar Nivel ] and [ Reset 0 ] */}
@@ -2468,7 +2746,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             </div>
 
             <div className="space-y-2">
-              {(['Gasolina Pb95', 'Gas GLP / LPG', 'Diésel ON'] as FuelKey[]).map((fKey) => {
+              {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((fKey) => {
                 const isCurrent = activeFuel === fKey;
                 const currentPrice = fuelPrices[fKey] || defaultPrices[selectedCountry]?.[fKey] || 6.09;
                 return (
@@ -2484,12 +2762,12 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   >
                     <div className="flex items-center space-x-3">
                       <span className="text-xl">
-                        {fKey === 'Gas GLP / LPG' ? '🔥' : fKey === 'Diésel ON' ? '🛢️' : '⛽'}
+                        {fKey === 'Gas LPG' ? '🔥' : fKey === 'Diésel ON' ? '🛢️' : '⛽'}
                       </span>
                       <div>
                         <div className="text-xs font-black">{fKey}</div>
                         <div className="text-[10px] text-slate-400">
-                          {fKey === 'Gas GLP / LPG'
+                          {fKey === 'Gas LPG'
                             ? 'Factor x1.20 • Máximo ahorro'
                             : fKey === 'Diésel ON'
                             ? 'Factor x0.85 • Alta eficiencia'
@@ -2627,10 +2905,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   Combustible a repostar:
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {(['Gasolina Pb95', 'Gas GLP / LPG', 'Diésel ON'] as FuelKey[]).map((f) => {
+                  {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((f) => {
                     const isSelected = refuelFuelType === f;
-                    const icon = f === 'Gas GLP / LPG' ? '🔥' : f === 'Diésel ON' ? '🛢️' : '⛽';
-                    const shortLabel = f === 'Gas GLP / LPG' ? 'GLP / LPG' : f === 'Gasolina Pb95' ? 'Gasolina' : 'Diésel';
+                    const icon = f === 'Gas LPG' ? '🔥' : f === 'Diésel ON' ? '🛢️' : '⛽';
+                    const shortLabel = f === 'Gas LPG' ? 'LPG' : f === 'Gasolina Pb95' ? 'Gasolina' : 'Diésel';
                     const storedP = fuelPrices[f] || defaultPrices[selectedCountry]?.[f] || 6.09;
 
                     return (

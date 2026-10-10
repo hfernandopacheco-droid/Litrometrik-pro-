@@ -390,7 +390,7 @@ export const CalculatorForm: React.FC<CalculatorFormProps> = ({ inputs, onChange
             <div className="flex items-center space-x-3">
               <Flame className="w-5 h-5 text-amber-600 animate-pulse" />
               <div>
-                <div className="font-bold text-xs text-amber-950">Arranque en frío (Gasolina inicial para GLP)</div>
+                <div className="font-bold text-xs text-amber-950">Arranque en frío (Gasolina inicial para LPG)</div>
                 <div className="text-[10px] text-amber-800 font-medium">Agrega 0.3L fijos de gasolina para encendido</div>
               </div>
             </div>

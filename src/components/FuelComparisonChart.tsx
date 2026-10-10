@@ -78,7 +78,7 @@ export const FuelComparisonChart: React.FC<FuelComparisonChartProps> = ({ inputs
   if (inputs.fuelType === 'lpg') {
     const diff = costGas - costLpg;
     savingsText = diff > 0 
-      ? `Con Autogas (GLP) ahorras aprox. ${diff.toFixed(2)} ${currency} frente a Gasolina en este viaje.`
+      ? `Con Autogás (LPG) ahorras aprox. ${diff.toFixed(2)} ${currency} frente a Gasolina en este viaje.`
       : `El costo es similar al de gasolina en esta distancia corta.`;
   } else if (inputs.fuelType === 'diesel') {
     const diff = costGas - costDiesel;
@@ -88,7 +88,7 @@ export const FuelComparisonChart: React.FC<FuelComparisonChartProps> = ({ inputs
   } else {
     const diffLpg = costGas - costLpg;
     savingsText = diffLpg > 0
-      ? `Si usaras GLP podrías ahorrar hasta ${diffLpg.toFixed(2)} ${currency} en este mismo trayecto.`
+      ? `Si usaras LPG podrías ahorrar hasta ${diffLpg.toFixed(2)} ${currency} en este mismo trayecto.`
       : `Gasolina es tu combustible seleccionado.`;
   }
 
@@ -120,7 +120,7 @@ export const FuelComparisonChart: React.FC<FuelComparisonChartProps> = ({ inputs
       liters: litersLpg,
       price: priceLpg,
       detailText: coldStartLpg
-        ? `${litersLpg.toFixed(2)}L GLP + ${coldStartGasLiters}L arranque`
+        ? `${litersLpg.toFixed(2)}L LPG + ${coldStartGasLiters}L arranque`
         : `${litersLpg.toFixed(2)}L x ${priceLpg.toFixed(2)} ${currency}/L`,
       barColor: 'from-emerald-500 to-teal-600',
       isCurrent: inputs.fuelType === 'lpg',

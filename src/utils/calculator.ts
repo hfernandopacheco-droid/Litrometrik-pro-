@@ -134,7 +134,7 @@ export function calculateDetailedTrip(inputs: CalculatorInputs): DetailedCalcula
   const costPer10Km = costPerKm * 10;
   const garrafas20L = totalLiters / 20;
 
-  // 6. LIVE COMPARISON ENGINE (Gasolina Pb95 vs Diésel ON vs Gas GLP)
+  // 6. LIVE COMPARISON ENGINE (Gasolina Pb95 vs Diésel ON vs Gas LPG)
   // Determine realistic prices for the 3 fuels
   const priceGas = fuelType === 'gasolina' && pricePerLiter > 0 ? pricePerLiter : officialGasPrice;
   const priceDie = fuelType === 'diesel' && pricePerLiter > 0 ? pricePerLiter : countryConfig.preciosDefecto.diesel;

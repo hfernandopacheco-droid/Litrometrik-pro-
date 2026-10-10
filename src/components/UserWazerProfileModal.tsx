@@ -29,10 +29,13 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
     return (localStorage.getItem('litrometrik_user_country') || localStorage.getItem('litrometrik_jurisdiction_country') || 'PL') as CountryCode;
   });
   const [selectedCarId, setSelectedCarId] = useState<string>('custom');
-  const [carModelName, setCarModelName] = useState(() => localStorage.getItem('litrometrik_user_vehicle_model') || 'Skoda Octavia 1.6 MPI (GLP)');
+  const [carModelName, setCarModelName] = useState(() => localStorage.getItem('litrometrik_user_vehicle_model') || 'Skoda Octavia 1.6 MPI (LPG)');
   const [vehicleType, setVehicleType] = useState(() => localStorage.getItem('litrometrik_user_vehicle') || 'sedan');
   const [engineSize, setEngineSize] = useState(() => localStorage.getItem('litrometrik_user_engine') || '1.6');
-  const [fuelType, setFuelType] = useState(() => localStorage.getItem('litrometrik_user_fuel') || 'GLP');
+  const [fuelType, setFuelType] = useState(() => {
+    const saved = localStorage.getItem('litrometrik_user_fuel');
+    return saved === 'GLP' ? 'LPG' : (saved || 'LPG');
+  });
 
   // Waze Navigation preferences
   const [defaultRouting, setDefaultRouting] = useState(() => localStorage.getItem('wazer_routing') || 'fastest');
@@ -451,7 +454,7 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
                 <option value="1.2">⚡ 1.2L PureTech / MPI</option>
                 <option value="1.4">⚙️ 1.4L TSI / Turbo</option>
                 <option value="1.5">⚙️ 1.5L TSI / Skyactiv-G</option>
-                <option value="1.6">⚙️ 1.6L MPI / MZR / GLP</option>
+                <option value="1.6">⚙️ 1.6L MPI / MZR / LPG</option>
                 <option value="1.8">🚀 1.8L Hybrid / VVT-i</option>
                 <option value="2.0">🚀 2.0L Skyactiv / TDI / TSI</option>
                 <option value="2.2">🏎️ 2.2L Diésel CRDi / D-4D</option>
@@ -475,7 +478,7 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
                   border: '1px solid rgba(255, 255, 255, 0.15)',
                 }}
               >
-                <option value="GLP">🟢 Gas GLP / Autogás</option>
+                <option value="LPG">🟢 Gas LPG / Autogás</option>
                 <option value="Gasolina">🔵 Gasolina 95 / Pb95</option>
                 <option value="Gasolina 98">⚡ Gasolina 98 Premium</option>
                 <option value="Diésel">🟡 Diésel / ACPM</option>

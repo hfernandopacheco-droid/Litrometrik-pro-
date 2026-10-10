@@ -30,7 +30,7 @@ export interface ViajeHistorico {
   litros: number;    // ej. 1.05
   costoPLN?: number;
   costo: number;     // ej. 3.94
-  combustible: string; // ej. "GLP"
+  combustible: string; // ej. "LPG"
   precioLitro: number; // ej. 3.75
   durationSeconds?: number;
   avgSpeedKmh?: number;
@@ -138,7 +138,7 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
 
   // ---------------- VEHICLE & ENGINE SPECIFICATION ----------------
   const [activeCarModel, setActiveCarModel] = useState<string>(() => {
-    return localStorage.getItem('litrometrik_user_vehicle_model') || 'Skoda Octavia 1.6 MPI (GLP)';
+    return localStorage.getItem('litrometrik_user_vehicle_model') || 'Skoda Octavia 1.6 MPI (LPG)';
   });
   const [vehicleType, setVehicleType] = useState<string>(() => {
     return localStorage.getItem('litrometrik_user_vehicle') || 'sedan';
@@ -153,13 +153,14 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
       const c = (localStorage.getItem('litrometrik_user_country') || localStorage.getItem('litrometrik_jurisdiction_country') || 'PL') as SupportedCountry;
       const v = localStorage.getItem('litrometrik_user_vehicle') || 'sedan';
       const e = localStorage.getItem('litrometrik_user_engine') || '1.6';
-      const f = (localStorage.getItem('litrometrik_user_fuel') as any) || 'GLP';
-      const m = localStorage.getItem('litrometrik_user_vehicle_model') || 'Skoda Octavia 1.6 MPI (GLP)';
+      const f = (localStorage.getItem('litrometrik_user_fuel') as any);
+      const normalizedF = f === 'GLP' ? 'LPG' : (f || 'LPG');
+      const m = localStorage.getItem('litrometrik_user_vehicle_model') || 'Skoda Octavia 1.6 MPI (LPG)';
       const d = parseFloat(localStorage.getItem('litrometrik_distancia_real_total') || localStorage.getItem('litrometrik_en_marcha_distancia') || '0') || 0;
       setSelectedCountry(c);
       setVehicleType(v);
       setEngineSize(e);
-      if (f) setGpsFuelType(f);
+      if (normalizedF) setGpsFuelType(normalizedF);
       if (m) setActiveCarModel(m);
       if (d !== undefined && !isNaN(d)) setDistanciaRealTotal(d);
     };
@@ -192,7 +193,7 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
     }
   });
 
-  const [gpsFuelType, setGpsFuelType] = useState<'GLP' | 'Gasolina' | 'Gasolina 98' | 'Diésel' | 'GNV'>('GLP');
+  const [gpsFuelType, setGpsFuelType] = useState<'LPG' | 'Gasolina' | 'Gasolina 98' | 'Diésel' | 'GNV'>('LPG');
   const [gpsCurrentSpeed, setGpsCurrentSpeed] = useState(0);
   const [gpsElapsedSeconds, setGpsElapsedSeconds] = useState<number>(() => {
     try {
@@ -236,15 +237,16 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
 
   // Price Per Liter for selected fuel and country
   const defaultFuelPricePerLiter = useMemo(() => {
+    const isLpg = gpsFuelType === 'LPG' || (gpsFuelType as string) === 'GLP';
     if (selectedCountry === 'PL') {
-      return gpsFuelType === 'GLP' ? 2.89 : gpsFuelType === 'Diésel' ? 6.15 : gpsFuelType === 'Gasolina 98' ? 6.95 : 6.45;
+      return isLpg ? 2.89 : gpsFuelType === 'Diésel' ? 6.15 : gpsFuelType === 'Gasolina 98' ? 6.95 : 6.45;
     } else if (selectedCountry === 'CO') {
-      return gpsFuelType === 'GLP' ? 2600 : gpsFuelType === 'GNV' ? 2400 : gpsFuelType === 'Diésel' ? 4400 : gpsFuelType === 'Gasolina 98' ? 4600 : 4200;
+      return isLpg ? 2600 : gpsFuelType === 'GNV' ? 2400 : gpsFuelType === 'Diésel' ? 4400 : gpsFuelType === 'Gasolina 98' ? 4600 : 4200;
     } else if (selectedCountry === 'ES') {
-      return gpsFuelType === 'GLP' ? 0.95 : gpsFuelType === 'Diésel' ? 1.45 : gpsFuelType === 'Gasolina 98' ? 1.72 : 1.58;
+      return isLpg ? 0.95 : gpsFuelType === 'Diésel' ? 1.45 : gpsFuelType === 'Gasolina 98' ? 1.72 : 1.58;
     } else {
       // México (MX)
-      return gpsFuelType === 'GLP' ? 12.80 : gpsFuelType === 'Diésel' ? 24.50 : gpsFuelType === 'Gasolina 98' ? 25.40 : 23.80;
+      return isLpg ? 12.80 : gpsFuelType === 'Diésel' ? 24.50 : gpsFuelType === 'Gasolina 98' ? 25.40 : 23.80;
     }
   }, [selectedCountry, gpsFuelType]);
 
@@ -254,6 +256,7 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
       if (stored) return JSON.parse(stored);
     } catch (_) {}
     return {
+      LPG: 2.89,
       GLP: 2.89,
       Gasolina: 6.45,
       'Gasolina 95': 6.45,
@@ -291,9 +294,10 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
     setIsInlinePriceEditing(false);
   };
 
-  const handleSelectFuel = (fuel: 'GLP' | 'Gasolina' | 'Diésel') => {
+  const handleSelectFuel = (fuel: 'LPG' | 'Gasolina' | 'Diésel') => {
     setGpsFuelType(fuel);
-    const price = customFuelPrices[fuel] || (selectedCountry === 'CO' ? (fuel === 'GLP' ? 2600 : fuel === 'Diésel' ? 4400 : 4200) : selectedCountry === 'ES' ? (fuel === 'GLP' ? 0.95 : fuel === 'Diésel' ? 1.45 : 1.58) : selectedCountry === 'MX' ? (fuel === 'GLP' ? 12.80 : fuel === 'Diésel' ? 24.50 : 23.80) : (fuel === 'GLP' ? 2.89 : fuel === 'Diésel' ? 6.15 : 6.45));
+    const isLpg = fuel === 'LPG';
+    const price = customFuelPrices[fuel] || (selectedCountry === 'CO' ? (isLpg ? 2600 : fuel === 'Diésel' ? 4400 : 4200) : selectedCountry === 'ES' ? (isLpg ? 0.95 : fuel === 'Diésel' ? 1.45 : 1.58) : selectedCountry === 'MX' ? (isLpg ? 12.80 : fuel === 'Diésel' ? 24.50 : 23.80) : (isLpg ? 2.89 : fuel === 'Diésel' ? 6.15 : 6.45));
     try {
       localStorage.setItem('litrometrik_active_fuel_type', fuel);
       localStorage.setItem('fuel_active_type', fuel);
@@ -349,14 +353,15 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
           if (!isNaN(val)) setDistanciaRealTotal(val);
         }
         const storedFuelType = localStorage.getItem('litrometrik_active_fuel_type') || localStorage.getItem('fuel_active_type');
-        if (storedFuelType && (storedFuelType === 'GLP' || storedFuelType === 'Gasolina' || storedFuelType === 'Diésel')) {
-          setGpsFuelType(storedFuelType as any);
+        const normalizedFuel = storedFuelType === 'GLP' ? 'LPG' : storedFuelType;
+        if (normalizedFuel && (normalizedFuel === 'LPG' || normalizedFuel === 'Gasolina' || normalizedFuel === 'Diésel')) {
+          setGpsFuelType(normalizedFuel as any);
         }
         const storedPrice = localStorage.getItem('fuel_price_per_liter');
         if (storedPrice !== null) {
           const parsed = parseFloat(storedPrice);
           if (!isNaN(parsed) && parsed > 0) {
-            setCustomFuelPrices(prev => ({ ...prev, [storedFuelType || 'GLP']: parsed }));
+            setCustomFuelPrices(prev => ({ ...prev, [normalizedFuel || 'LPG']: parsed }));
           }
         }
         const storedCustomPrices = localStorage.getItem('litrometrik_custom_fuel_prices');
@@ -383,20 +388,22 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
     if (vehicleType === 'suv') base += 1.2;
     else if (vehicleType === 'compact') base -= 0.6;
 
+    const isLpg = gpsFuelType === 'LPG' || (gpsFuelType as string) === 'GLP';
     let fuelFactor = 1.0;
-    if (gpsFuelType === 'GLP') fuelFactor = 1.20;
+    if (isLpg) fuelFactor = 1.20;
     else if (gpsFuelType === 'Diésel') fuelFactor = 0.85;
     else if (gpsFuelType === 'Gasolina 98') fuelFactor = 0.97;
 
     return {
       rateL100: base * fuelFactor,
-      idleLPerHour: Math.max(0.5, disp * 0.55 * (gpsFuelType === 'GLP' ? 1.2 : 1.0)),
+      idleLPerHour: Math.max(0.5, disp * 0.55 * (isLpg ? 1.2 : 1.0)),
     };
   }, [engineSize, vehicleType, gpsFuelType]);
 
   // Live Liters and Cost Calculation directly dependent on distanciaRealTotal:
   const consumoEnVivo = useMemo(() => {
-    const rate = gpsFuelType === 'GLP' ? 8.18 : (engineBaseCons.rateL100 || 8.18);
+    const isLpg = gpsFuelType === 'LPG' || (gpsFuelType as string) === 'GLP';
+    const rate = isLpg ? 8.18 : (engineBaseCons.rateL100 || 8.18);
     const movingLiters = (distanciaRealTotal * rate) / 100;
     const idleHours = isVehicleStopped ? gpsElapsedSeconds / 3600 : 0;
     const idleLiters = idleHours * engineBaseCons.idleLPerHour;
@@ -705,7 +712,7 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
           km: s.distanceKm ?? s.km ?? 0,
           litros: s.litersConsumed ?? s.litros ?? 0,
           costo: s.cost ?? s.costo ?? 0,
-          combustible: s.fuelType || s.combustible || 'GLP',
+          combustible: s.fuelType === 'GLP' ? 'LPG' : (s.fuelType || s.combustible || 'LPG'),
           precioLitro: s.pricePerLiter || s.precioLitro || 2.89,
           durationSeconds: s.durationSeconds || 0,
           avgSpeedKmh: s.avgSpeedKmh || 0,
@@ -1121,11 +1128,11 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
               </div>
             </div>
 
-            {/* Selector de Combustible (GLP, Gasolina 95, Diésel) y Toggle Switch */}
+            {/* Selector de Combustible (LPG, Gasolina 95, Diésel) y Toggle Switch */}
             <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-center">
               {/* Selector interactivo de combustible */}
               <div className="inline-flex p-1 bg-[#0F172A] rounded-xl border border-slate-700 shadow-inner">
-                {(['GLP', 'Gasolina', 'Diésel'] as const).map((fuel) => {
+                {(['LPG', 'Gasolina', 'Diésel'] as const).map((fuel) => {
                   const isSelected = gpsFuelType === fuel;
                   const label = fuel === 'Gasolina' ? 'Gasolina 95' : fuel;
                   return (

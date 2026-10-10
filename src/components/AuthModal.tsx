@@ -57,7 +57,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [editCarModelName, setEditCarModelName] = useState('Skoda Octavia');
   const [editVehicleType, setEditVehicleType] = useState('sedan');
   const [editEngineSize, setEditEngineSize] = useState('1.6');
-  const [editFuelType, setEditFuelType] = useState('GLP');
+  const [editFuelType, setEditFuelType] = useState('LPG');
   const [editSavedToast, setEditSavedToast] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,16 +77,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const savedCountry = (localStorage.getItem('litrometrik_user_country') || localStorage.getItem('litrometrik_jurisdiction_country') || 'PL') as CountryCode;
       setEditCountry(savedCountry);
 
-      const savedCarModel = localStorage.getItem('litrometrik_user_vehicle_model') || 'Skoda Octavia 1.6 MPI (GLP)';
+      const savedCarModel = localStorage.getItem('litrometrik_user_vehicle_model') || 'Skoda Octavia 1.6 MPI (LPG)';
       setEditCarModelName(savedCarModel);
 
       const savedVehicle = localStorage.getItem('litrometrik_user_vehicle') || 'sedan';
       const savedEngine = localStorage.getItem('litrometrik_user_engine') || '1.6';
-      const savedFuel = localStorage.getItem('litrometrik_user_fuel') || 'GLP';
+      const savedFuel = localStorage.getItem('litrometrik_user_fuel');
+      const normalizedFuel = savedFuel === 'GLP' ? 'LPG' : (savedFuel || 'LPG');
       
       setEditVehicleType(savedVehicle);
       setEditEngineSize(savedEngine);
-      setEditFuelType(savedFuel);
+      setEditFuelType(normalizedFuel);
 
       const foundCar = DATA_PAIS[savedCountry]?.cars?.find(c => c.model === savedCarModel);
       if (foundCar) {
@@ -105,7 +106,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setSelectedCarId(firstCar.id);
       setEditCarModelName(`${firstCar.brand} ${firstCar.model}`);
       setEditEngineSize(firstCar.displacementL ? String(firstCar.displacementL) : '1.6');
-      setEditFuelType(firstCar.defaultFuel || 'GLP');
+      const defF = firstCar.defaultFuel || 'LPG';
+      setEditFuelType(defF);
     } else {
       setSelectedCarId('custom');
     }
@@ -121,7 +123,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (foundCar) {
       setEditCarModelName(`${foundCar.brand} ${foundCar.model}`);
       setEditEngineSize(foundCar.displacementL ? String(foundCar.displacementL) : '1.6');
-      setEditFuelType(foundCar.defaultFuel || 'GLP');
+      const defF = foundCar.defaultFuel || 'LPG';
+      setEditFuelType(defF);
       if (foundCar.bodyType) {
         setEditVehicleType(foundCar.bodyType);
       }
@@ -542,7 +545,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     onChange={(e) => setEditFuelType(e.target.value)}
                     className="w-full bg-[#0f172a] border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="GLP">🟢 Gas GLP / Autogás</option>
+                    <option value="LPG">🟢 Gas LPG / Autogás</option>
                     <option value="Gasolina">🔵 Gasolina 95</option>
                     <option value="Gasolina 98">⚡ Gasolina 98</option>
                     <option value="Diésel">🟡 Diésel</option>

@@ -563,7 +563,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
               },
               {
                 id: 'lpg',
-                name: 'Gas GLP / LPG',
+                name: 'Gas LPG',
                 factorStr: 'x1.20',
                 note: '+20% consumo',
                 price: countryData.preciosDefecto.lpg,
@@ -979,7 +979,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
               </div>
             </div>
 
-            {/* 3. Gas GLP / LPG (Verde Esmeralda #10B981) */}
+            {/* 3. Gas LPG (Verde Esmeralda #10B981) */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs font-black">
                 <div className="flex items-center space-x-1.5">
@@ -1015,7 +1015,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
             </div>
           </div>
 
-          {/* Tarjeta Destacada de Ahorro con GLP (Integrada debajo del gráfico) */}
+          {/* Tarjeta Destacada de Ahorro con LPG (Integrada debajo del gráfico) */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/70 via-emerald-900/50 to-teal-950/70 border border-emerald-500/40 flex items-start space-x-3.5 shadow-xl">
             <div className="p-2.5 rounded-xl bg-emerald-500 text-slate-950 shrink-0 mt-0.5 shadow-md shadow-emerald-500/30">
               <Sparkles className="w-5 h-5" />
@@ -1024,7 +1024,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
               <div className="text-xs font-black text-white">
                 {calc.comparativa.savingGlpVsGas > 0 ? (
                   <span>
-                    Si usaras GLP podrías ahorrar hasta{' '}
+                    Si usaras LPG podrías ahorrar hasta{' '}
                     <span className="text-emerald-300 font-black text-sm">
                       {calc.comparativa.savingGlpVsGas.toFixed(2).replace('.', ',')} {currency}
                     </span>{' '}
@@ -1032,7 +1032,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                   </span>
                 ) : (
                   <span>
-                    Conduciendo con GLP disfrutas del costo más económico por kilómetro.
+                    Conduciendo con LPG disfrutas del costo más económico por kilómetro.
                   </span>
                 )}
               </div>

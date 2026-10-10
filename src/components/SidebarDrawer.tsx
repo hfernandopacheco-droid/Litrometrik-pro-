@@ -20,7 +20,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
     {
       key: 'refuels' as ModuleKey,
       title: 'Bitácora de Repostaje',
-      subtitle: 'Cargas de GLP, Gasolina y Diésel',
+      subtitle: 'Cargas de LPG, Gasolina y Diésel',
       icon: Fuel,
       badge: 'Firestore',
     },
@@ -34,7 +34,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
     {
       key: 'maintenance' as ModuleKey,
       title: 'Mantenimiento Preventivo',
-      subtitle: 'Aceite, bujías, filtros GLP y aire',
+      subtitle: 'Aceite, bujías, filtros LPG y aire',
       icon: Wrench,
       badge: 'Gestión',
     },

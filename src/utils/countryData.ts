@@ -17,7 +17,7 @@ export interface CarModelSpec {
   engine: string;
   displacementL: string;
   bodyType: 'compact' | 'sedan' | 'suv' | 'van' | 'pickup';
-  defaultFuel: 'LPG' | 'GLP' | 'Gasolina' | 'Gasolina 98' | 'Diésel' | 'GNV';
+  defaultFuel: 'LPG' | 'Gasolina' | 'Gasolina 98' | 'Diésel' | 'GNV';
   badge?: string;
 }
 
@@ -374,7 +374,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
       { id: 'mx-vw-jetta-14t', brand: 'Volkswagen', model: 'Jetta 1.4 TSI Turbo', engine: '1.4L TSI Turbo 150 HP', displacementL: '1.4', bodyType: 'sedan', defaultFuel: 'Gasolina', badge: 'Clásico Mexicano' },
       { id: 'mx-nissan-march-16', brand: 'Nissan', model: 'March 1.6L', engine: '1.6L 4-Cilindros 106 HP', displacementL: '1.6', bodyType: 'compact', defaultFuel: 'Gasolina' },
       { id: 'mx-toyota-rav4-hybrid', brand: 'Toyota', model: 'RAV4 2.5 Híbrida', engine: '2.5L Híbrido 219 HP Sin Verificación', displacementL: '2.5', bodyType: 'suv', defaultFuel: 'Gasolina', badge: 'Holo Exento' },
-      { id: 'mx-chevrolet-silverado-v8', brand: 'Chevrolet', model: 'Silverado 5.3 V8 (Gas LP)', engine: '5.3L V8 355 HP Bi-Fuel Gas LP', displacementL: '4.0', bodyType: 'pickup', defaultFuel: 'GLP', badge: 'V8 / Gas LP' },
+      { id: 'mx-chevrolet-silverado-v8', brand: 'Chevrolet', model: 'Silverado 5.3 V8 (Gas LP)', engine: '5.3L V8 355 HP Bi-Fuel Gas LP', displacementL: '4.0', bodyType: 'pickup', defaultFuel: 'LPG', badge: 'V8 / Gas LP' },
       { id: 'mx-nissan-np300-diesel', brand: 'Nissan', model: 'NP300 2.5L Diésel', engine: '2.5L Turbo Diésel 161 HP', displacementL: '2.5', bodyType: 'pickup', defaultFuel: 'Diésel', badge: 'Trabajo Rudo' }
     ],
     tramitesLegales: [
