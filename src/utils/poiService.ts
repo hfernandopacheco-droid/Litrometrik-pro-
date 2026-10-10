@@ -337,14 +337,16 @@ export async function fetchGooglePlacesPOIs(
 
       const queryType = (t: string): Promise<RealPOI[]> => {
         return new Promise((resolve) => {
+          const LatLngCtor = (window as any).google?.maps?.LatLng;
           const req: any = {
-            location: new (window as any).google.maps.LatLng(centerLat, centerLng),
+            location: LatLngCtor ? new LatLngCtor(centerLat, centerLng) : { lat: centerLat, lng: centerLng },
             radius: Math.min(Math.max(radiusMeters, 1500), 10000),
             type: t
           };
 
           service.nearbySearch(req, (results: any[], status: any) => {
-            if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+            const okStatus = (window as any).google?.maps?.places?.PlacesServiceStatus?.OK || 'OK';
+            if (status === okStatus && results && results.length > 0) {
               const mapped: RealPOI[] = results.map((place) => {
                 const lat = place.geometry?.location?.lat() || centerLat;
                 const lng = place.geometry?.location?.lng() || centerLng;
@@ -788,7 +790,8 @@ export async function fetchGooglePlaceDetailsLive(
             fields: ['name', 'formatted_address', 'photos', 'rating', 'user_ratings_total', 'opening_hours', 'geometry', 'formatted_phone_number', 'website', 'types']
           },
           (place: any, status: any) => {
-            if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && place) {
+            const okStatus = (window as any).google?.maps?.places?.PlacesServiceStatus?.OK || 'OK';
+            if (status === okStatus && place) {
               const realPhotos: string[] = [];
               if (place.photos && Array.isArray(place.photos) && place.photos.length > 0) {
                 place.photos.forEach((photoObj: any) => {
