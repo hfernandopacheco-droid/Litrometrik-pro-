@@ -1190,8 +1190,8 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
           MODAL FLOTANTE / VENTANA DEDICADA DE SELECCIÓN DE MOTOR
          ========================================================================= */}
       {isEngineModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-[#0E131F] border border-slate-800 rounded-3xl shadow-2xl h-[82dvh] max-h-[600px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[200] flex flex-col justify-between sm:justify-center items-center p-3 sm:p-4 pb-20 sm:pb-6 bg-black/85 backdrop-blur-md overflow-hidden animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-[#0E131F] border border-slate-800 rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-5.5rem)] sm:max-h-[600px] overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header Fijo */}
             <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#0E131F]">
               <div className="flex items-center space-x-2.5">
@@ -1336,7 +1336,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
             </div>
 
             {/* Action Buttons Footer Fijo y Visible */}
-            <div className="p-4 pb-[max(env(safe-area-inset-bottom,0px),20px)] sm:pb-4 border-t border-slate-800 bg-[#080B11] shrink-0 flex space-x-2.5 z-10">
+            <div className="p-4 border-t border-slate-800 bg-[#080B11] shrink-0 flex space-x-2.5 z-20 shadow-2xl">
               <button
                 type="button"
                 onClick={handleCancelEngineModal}

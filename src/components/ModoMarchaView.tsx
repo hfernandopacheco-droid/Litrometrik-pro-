@@ -98,6 +98,8 @@ export interface ViajeRegistro {
   idleSeconds?: number;
   vehicleType?: string;
   isACActive?: boolean;
+  tipoRegistro?: 'viaje' | 'repostaje';
+  estacion?: string;
 }
 
 const VEHICLE_PRESETS: UnifiedVehicleCategory[] = Object.values(UNIFIED_VEHICLE_CATALOG);
@@ -715,15 +717,66 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     }
   };
 
+  // Helper to load all trips and refuel records seamlessly
+  const loadMergedHistory = (): ViajeRegistro[] => {
+    const list: ViajeRegistro[] = [];
+    const idSet = new Set<string>();
+
+    try {
+      const storedTrips = localStorage.getItem('historial_viajes');
+      if (storedTrips) {
+        const parsed = JSON.parse(storedTrips);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((t) => {
+            if (t && t.id && !idSet.has(t.id)) {
+              idSet.add(t.id);
+              list.push(t);
+            }
+          });
+        }
+      }
+    } catch (_) {}
+
+    try {
+      const uid = currentUser?.uid || 'guest';
+      const refuelsRaw =
+        localStorage.getItem(`litrometrik_${uid}_repostajes`) ||
+        localStorage.getItem('litrometrik_repostajes') ||
+        localStorage.getItem('litrometrik_guest_repostajes');
+      if (refuelsRaw) {
+        const parsedRefuels = JSON.parse(refuelsRaw);
+        if (Array.isArray(parsedRefuels)) {
+          parsedRefuels.forEach((r) => {
+            if (r && r.id && !idSet.has(r.id)) {
+              idSet.add(r.id);
+              list.push({
+                id: r.id,
+                timestamp: r.createdAt || new Date().toISOString(),
+                date: r.refuelDate || (r.createdAt ? r.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
+                km: 0,
+                litros: Number(r.liters) || 0,
+                costo: Number(r.cost) || 0,
+                combustible: r.fuelType || 'Gas LPG',
+                precioLitro: Number(r.pricePerLiter) || 0,
+                moneda: r.moneda || currency,
+                pais: r.pais || selectedCountry,
+                vehicleType: vehicleType,
+                tipoRegistro: 'repostaje',
+                estacion: r.station || r.title || 'Estación',
+              });
+            }
+          });
+        }
+      }
+    } catch (_) {}
+
+    list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return list;
+  };
+
   // Period filter for Chart & History
   const [filtroPeriodo, setFiltroPeriodo] = useState<TimeFilterPeriod>('DIA');
-  const [historialViajes, setHistorialViajes] = useState<ViajeRegistro[]>(() => {
-    try {
-      const stored = localStorage.getItem('historial_viajes');
-      if (stored) return JSON.parse(stored);
-    } catch (_) {}
-    return [];
-  });
+  const [historialViajes, setHistorialViajes] = useState<ViajeRegistro[]>(loadMergedHistory);
 
   // Synchronize storage from external tab updates
   useEffect(() => {
@@ -731,18 +784,22 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       try {
         const storedTanks = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
         if (storedTanks) {
-          setFuelTanks((prev) => {
-            if (JSON.stringify(prev) === storedTanks) return prev;
-            return JSON.parse(storedTanks);
-          });
+          try {
+            const parsed = JSON.parse(storedTanks);
+            setFuelTanks((prev) => ({
+              'Gasolina Pb95': parsed['Gasolina Pb95'] !== undefined ? parsed['Gasolina Pb95'] : prev['Gasolina Pb95'],
+              'Gas LPG': parsed['Gas LPG'] !== undefined ? parsed['Gas LPG'] : (parsed['Gas GLP / LPG'] !== undefined ? parsed['Gas GLP / LPG'] : prev['Gas LPG']),
+              'Diésel ON': parsed['Diésel ON'] !== undefined ? parsed['Diésel ON'] : prev['Diésel ON'],
+            }));
+          } catch (_) {}
         }
-        const storedTrips = localStorage.getItem('historial_viajes');
-        if (storedTrips) {
-          setHistorialViajes((prev) => {
-            if (JSON.stringify(prev) === storedTrips) return prev;
-            return JSON.parse(storedTrips);
-          });
+        const storedActive = localStorage.getItem('litrometrik_active_fuel') as FuelKey;
+        if (storedActive && (storedActive === 'Gas LPG' || storedActive === 'Gasolina Pb95' || storedActive === 'Diésel ON')) {
+          setActiveFuel(storedActive);
+          activeFuelRef.current = storedActive;
         }
+        const merged = loadMergedHistory();
+        setHistorialViajes(merged);
         const storedUltimo = localStorage.getItem('litrometrik_ultimo_tanqueo');
         if (storedUltimo) {
           try {
@@ -753,9 +810,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     };
 
     window.addEventListener('storage', handleStorageSync);
+    window.addEventListener('fuel-storage-updated', handleStorageSync);
     window.addEventListener('litrometrik-records-updated', handleStorageSync);
     return () => {
       window.removeEventListener('storage', handleStorageSync);
+      window.removeEventListener('fuel-storage-updated', handleStorageSync);
       window.removeEventListener('litrometrik-records-updated', handleStorageSync);
     };
   }, [selectedCountry]);
@@ -1216,37 +1275,51 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const handleSwitchFuel = (targetFuel: FuelKey) => {
     if (targetFuel === activeFuel) return;
 
-    // Deduct accumulated cost and liters from the previous fuel's tank
+    let latestMap = { ...fuelTanks };
+    try {
+      const stored = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
+      if (stored) {
+        latestMap = { ...latestMap, ...JSON.parse(stored) };
+      }
+    } catch (_) {}
+
+    // Deduct accumulated cost and liters from previous fuel if running
     if (liveCost > 0 || liveLiters > 0) {
-      setFuelTanks((prev) => {
-        const cur = prev[activeFuel] || { balance: 0, liters: 0 };
-        const newBal = Math.max(0, Math.round((cur.balance - liveCost) * 100) / 100);
-        const newLit = Math.max(0, Math.round(((cur.liters || (fuelPrice > 0 ? cur.balance / fuelPrice : 0)) - liveLiters) * 100) / 100);
-        const updated = {
-          ...prev,
-          [activeFuel]: { ...cur, balance: newBal, liters: newLit },
-        };
-        try {
-          localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
-        } catch (_) {}
-        return updated;
-      });
+      const cur = latestMap[activeFuel] || { balance: 0, liters: 0 };
+      const newBal = Math.max(0, Math.round((cur.balance - liveCost) * 100) / 100);
+      const newLit = Math.max(0, Math.round(((cur.liters || (fuelPrice > 0 ? cur.balance / fuelPrice : 0)) - liveLiters) * 100) / 100);
+      latestMap = {
+        ...latestMap,
+        [activeFuel]: { ...cur, balance: newBal, liters: newLit },
+      };
       setLiveCost(0);
       setLiveLiters(0);
     }
 
-    setActiveFuel(targetFuel);
-    activeFuelRef.current = targetFuel;
+    const targetBal = latestMap[targetFuel]?.balance ?? 0;
     const p = fuelPrices[targetFuel] || defaultPrices[selectedCountry]?.[targetFuel] || 2.89;
-    setFuelPrice(p);
-    fuelPriceRef.current = p;
+
     try {
+      localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(latestMap));
       localStorage.setItem('litrometrik_active_fuel', targetFuel);
       localStorage.setItem('fuel_price_per_liter', p.toString());
+      localStorage.setItem('litrometrik_base_fuel_balance_pln', targetBal.toString());
+      localStorage.setItem('litrometrik_fuel_balance_pln', targetBal.toFixed(2));
+      localStorage.setItem('fuel_balance_pln', targetBal.toFixed(2));
+      localStorage.setItem('currentFuelBalancePLN', targetBal.toFixed(2));
     } catch (_) {}
 
+    setFuelTanks(latestMap);
+    setActiveFuel(targetFuel);
+    activeFuelRef.current = targetFuel;
+    setFuelPrice(p);
+    fuelPriceRef.current = p;
+
+    window.dispatchEvent(new Event('fuel-storage-updated'));
+    window.dispatchEvent(new Event('storage'));
+
     const shortLabel = targetFuel === 'Gas LPG' ? 'LPG' : targetFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina';
-    setNotification(`⛽ Conmutado a ${shortLabel} (${p.toFixed(2)} ${currency}/L) • Tanque y telemetría sincronizados`);
+    setNotification(`⛽ Conmutado a ${shortLabel} (${p.toFixed(2)} ${currency}/L) • Tanque y modo en vivo sincronizados`);
     setTimeout(() => setNotification(null), 3000);
   };
 
@@ -1353,47 +1426,53 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
     const addedLiters = finalPrice > 0 ? Math.round((amount / finalPrice) * 100) / 100 : 0;
 
-    // 2. Guardar en el tanque correspondiente a ese combustible en fuelTanks
-    setFuelTanks((prev) => {
-      const prevTank = prev[targetFuelKey] || { balance: 0, liters: 0 };
-      const prevBal = Number(prevTank.balance) || 0;
-      const nextBal = Math.round((prevBal + amount) * 100) / 100;
-      const prevLit = Number(prevTank.liters) || (finalPrice > 0 ? prevBal / finalPrice : 0);
-      const nextLit = Math.round((prevLit + addedLiters) * 100) / 100;
-      const nextMap: FuelTankMap = {
-        ...prev,
-        [targetFuelKey]: {
-          balance: nextBal,
-          liters: nextLit,
-          lastRefuelAmount: amount,
-          lastRefuelPrice: finalPrice,
-          lastRefuelDate: new Date().toISOString(),
-        },
-      };
-      try {
-        localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(nextMap));
-        localStorage.setItem('litrometrik_base_fuel_balance_pln', nextBal.toString());
-        localStorage.setItem('litrometrik_fuel_balance_pln', Math.max(0, nextBal - liveCost).toFixed(2));
-        localStorage.setItem('fuel_balance_pln', Math.max(0, nextBal - liveCost).toFixed(2));
-        localStorage.setItem('currentFuelBalancePLN', Math.max(0, nextBal - liveCost).toFixed(2));
-      } catch (_) {}
-      return nextMap;
-    });
+    // 2. Leer mapa más reciente para evitar sobreescritura de tanques
+    let currentMap: FuelTankMap = { ...fuelTanks };
+    try {
+      const stored = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
+      if (stored) {
+        currentMap = { ...currentMap, ...JSON.parse(stored) };
+      }
+    } catch (_) {}
 
-    // 3. Si se repostó otro combustible, activar de inmediato ese combustible para reflejar el saldo en pantalla
-    if (targetFuelKey !== activeFuel) {
-      setActiveFuel(targetFuelKey);
-      activeFuelRef.current = targetFuelKey;
-      setFuelPrice(finalPrice);
-      fuelPriceRef.current = finalPrice;
-      try {
-        localStorage.setItem('litrometrik_active_fuel', targetFuelKey);
-        localStorage.setItem('fuel_price_per_liter', finalPrice.toString());
-      } catch (_) {}
-    } else {
-      setFuelPrice(finalPrice);
-      fuelPriceRef.current = finalPrice;
-    }
+    const prevTank = currentMap[targetFuelKey] || { balance: 0, liters: 0 };
+    const prevBal = Number(prevTank.balance) || 0;
+    const nextBal = Math.round((prevBal + amount) * 100) / 100;
+    const prevLit = Number(prevTank.liters) || (finalPrice > 0 ? prevBal / finalPrice : 0);
+    const nextLit = Math.round((prevLit + addedLiters) * 100) / 100;
+
+    const nextMap: FuelTankMap = {
+      ...currentMap,
+      [targetFuelKey]: {
+        balance: nextBal,
+        liters: nextLit,
+        lastRefuelAmount: amount,
+        lastRefuelPrice: finalPrice,
+        lastRefuelDate: new Date().toISOString(),
+      },
+    };
+
+    // 3. Persistir INMEDIATAMENTE en localStorage antes de emitir ningún evento
+    try {
+      localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(nextMap));
+      localStorage.setItem('litrometrik_base_fuel_balance_pln', nextBal.toString());
+      localStorage.setItem('litrometrik_fuel_balance_pln', nextBal.toFixed(2));
+      localStorage.setItem('fuel_balance_pln', nextBal.toFixed(2));
+      localStorage.setItem('currentFuelBalancePLN', nextBal.toFixed(2));
+      localStorage.setItem('litrometrik_active_fuel', targetFuelKey);
+      localStorage.setItem('fuel_price_per_liter', finalPrice.toString());
+    } catch (_) {}
+
+    // Actualizar estado reactivo de tanques
+    setFuelTanks(nextMap);
+
+    // 4. Activar de inmediato ese combustible para reflejar el saldo en su botón, pantalla y modo en vivo
+    setActiveFuel(targetFuelKey);
+    activeFuelRef.current = targetFuelKey;
+    setFuelPrice(finalPrice);
+    fuelPriceRef.current = finalPrice;
+    setLiveCost(0);
+    setLiveLiters(0);
 
     try {
       const uid = currentUser?.uid || currentUser?.id || 'guest';
@@ -1430,6 +1509,31 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       localStorage.setItem('litrometrik_ultimo_tanqueo', JSON.stringify(newRefuelEntry));
       setUltimoTanqueo(newRefuelEntry);
 
+      // Sincronizar inmediatamente con el historial de Modo Marcha para que aparezca visible de inmediato
+      const viajeRefuelEntry: ViajeRegistro = {
+        id: newRefuelEntry.id,
+        timestamp: newRefuelEntry.createdAt,
+        date: newRefuelEntry.refuelDate,
+        km: 0,
+        litros: addedLiters,
+        costo: amount,
+        combustible: targetFuelKey,
+        precioLitro: finalPrice,
+        moneda: currency,
+        pais: selectedCountry,
+        vehicleType: vehicleType,
+        tipoRegistro: 'repostaje',
+        estacion: defaultStation,
+      };
+
+      setHistorialViajes((prev) => {
+        const next = [viajeRefuelEntry, ...prev.filter((h) => h.id !== viajeRefuelEntry.id)];
+        try {
+          localStorage.setItem('historial_viajes', JSON.stringify(next));
+        } catch (_) {}
+        return next;
+      });
+
       if (uid && uid !== 'guest' && uid !== 'guest_user') {
         saveCloudRecord(uid, 'repostajes', newRefuelEntry);
         insertSupabaseRefuel(uid, {
@@ -1443,7 +1547,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         }).catch((e) => console.warn('Supabase refuel sync notice:', e));
 
         saveCloudVehicleConfig(uid, {
-          fuelBalance: Math.max(0, (fuelTanks[targetFuelKey]?.balance || 0) + amount - (targetFuelKey === activeFuel ? liveCost : 0)),
+          fuelBalance: Math.max(0, nextBal - (targetFuelKey === activeFuel ? liveCost : 0)),
           fuelPricePerLiter: finalPrice,
           lastFuelType: targetFuelKey,
         });
@@ -1473,24 +1577,29 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     const clampedTarget = Math.max(0, Math.round(targetBal * 100) / 100);
     const newLiters = fuelPrice > 0 ? Math.round((clampedTarget / fuelPrice) * 100) / 100 : 0;
 
-    setFuelTanks((prev) => {
-      const updated: FuelTankMap = {
-        ...prev,
-        [activeFuel]: {
-          ...prev[activeFuel],
-          balance: clampedTarget,
-          liters: newLiters,
-        },
-      };
-      try {
-        localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
-        localStorage.setItem('litrometrik_base_fuel_balance_pln', clampedTarget.toString());
-        localStorage.setItem('litrometrik_fuel_balance_pln', clampedTarget.toString());
-        localStorage.setItem('fuel_balance_pln', clampedTarget.toString());
-      } catch (_) {}
-      return updated;
-    });
+    let currentMap: FuelTankMap = { ...fuelTanks };
+    try {
+      const stored = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
+      if (stored) currentMap = { ...currentMap, ...JSON.parse(stored) };
+    } catch (_) {}
 
+    const updated: FuelTankMap = {
+      ...currentMap,
+      [activeFuel]: {
+        ...currentMap[activeFuel],
+        balance: clampedTarget,
+        liters: newLiters,
+      },
+    };
+
+    try {
+      localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
+      localStorage.setItem('litrometrik_base_fuel_balance_pln', clampedTarget.toString());
+      localStorage.setItem('litrometrik_fuel_balance_pln', clampedTarget.toString());
+      localStorage.setItem('fuel_balance_pln', clampedTarget.toString());
+    } catch (_) {}
+
+    setFuelTanks(updated);
     setLiveCost(0);
     setLiveLiters(0);
 
@@ -1511,23 +1620,29 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const handleResetZero = () => {
     const shortName = activeFuel === 'Gas LPG' ? 'LPG' : activeFuel === 'Diésel ON' ? 'Diésel' : 'Gasolina';
     if (window.confirm(`¿Seguro que deseas restablecer el saldo del tanque de ${shortName} a 0,00?`)) {
-      setFuelTanks((prev) => {
-        const updated: FuelTankMap = {
-          ...prev,
-          [activeFuel]: {
-            ...prev[activeFuel],
-            balance: 0,
-            liters: 0,
-          },
-        };
-        try {
-          localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
-          localStorage.setItem('litrometrik_base_fuel_balance_pln', '0');
-          localStorage.setItem('litrometrik_fuel_balance_pln', '0');
-          localStorage.setItem('fuel_balance_pln', '0');
-        } catch (_) {}
-        return updated;
-      });
+      let currentMap: FuelTankMap = { ...fuelTanks };
+      try {
+        const stored = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
+        if (stored) currentMap = { ...currentMap, ...JSON.parse(stored) };
+      } catch (_) {}
+
+      const updated: FuelTankMap = {
+        ...currentMap,
+        [activeFuel]: {
+          ...currentMap[activeFuel],
+          balance: 0,
+          liters: 0,
+        },
+      };
+
+      try {
+        localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(updated));
+        localStorage.setItem('litrometrik_base_fuel_balance_pln', '0');
+        localStorage.setItem('litrometrik_fuel_balance_pln', '0');
+        localStorage.setItem('fuel_balance_pln', '0');
+      } catch (_) {}
+
+      setFuelTanks(updated);
       setLiveCost(0);
       setLiveLiters(0);
       const uid = currentUser?.uid;
@@ -1943,15 +2058,14 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Solo cálculo exacto y combustible sincronizado con Saldo Restante */}
+            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Solo combustible activo sincronizado con Saldo Restante */}
             <div className="relative min-h-[142px] sm:min-h-[148px] p-3.5 sm:p-4 rounded-bl-[32px] rounded-br-2xl rounded-tl-2xl rounded-tr-[42px] bg-[#121620]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between overflow-hidden">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase">
                   GASTO EN VIVO
                 </span>
-                {/* Insignia distintiva con el combustible exacto activo */}
-                <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-[#FF4F00]/15 border border-[#FF4F00]/30 text-[#FF7A30] flex items-center space-x-1 shrink-0">
-                  <span>{activeFuel === 'Gas LPG' ? '🔥 Gas LPG' : activeFuel === 'Diésel ON' ? '🛢️ Diésel ON' : '⛽ Gasolina Pb95'}</span>
+                <span className="text-[11px] font-bold text-slate-300 flex items-center space-x-1">
+                  <span>{activeFuel === 'Gas LPG' ? '🔥 LPG' : activeFuel === 'Diésel ON' ? '🛢️ Diésel' : '⛽ Gasolina'}</span>
                 </span>
               </div>
 
@@ -1960,17 +2074,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   {liveCost.toFixed(2).replace('.', ',')} <span className="text-xs font-bold">{currency}</span>
                 </div>
 
-                {/* Fórmula transparente del costo en vivo en tiempo real (L gastados × Precio/L) */}
-                <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                  <span>{liveLiters.toFixed(2).replace('.', ',')} L × {(fuelPrices[activeFuel] || fuelPrice || 0).toFixed(2).replace('.', ',')} {currency}/L</span>
-                </div>
-
-                {/* Combustible activo sincronizado directamente con Saldo Restante */}
-                <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
-                  <span className="text-slate-400 font-bold truncate">Combustible activo:</span>
-                  <span className="font-black text-[#FF7A30] truncate flex items-center space-x-1">
-                    <span>{activeFuel === 'Gas LPG' ? '🔥 Gas LPG' : activeFuel === 'Diésel ON' ? '🛢️ Diésel ON' : '⛽ Gasolina Pb95'}</span>
-                  </span>
+                <div className="text-[11px] text-slate-300 font-bold truncate mt-0.5">
+                  <span>{activeFuel === 'Gas LPG' ? 'Combustible: Gas LPG' : activeFuel === 'Diésel ON' ? 'Combustible: Diésel ON' : 'Combustible: Gasolina Pb95'}</span>
                 </div>
               </div>
             </div>
@@ -2545,36 +2650,59 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {viajesFiltrados.map((v) => (
-                  <div
-                    key={v.id}
-                    className="p-3.5 rounded-2xl bg-[#121620] border border-slate-800/80 flex items-center justify-between shadow-sm"
-                  >
-                    <div>
-                      <div className="text-xs font-bold text-white flex items-center space-x-2">
-                        <span>{v.date || new Date(v.timestamp).toLocaleDateString('es-ES')}</span>
-                        <span className="px-1.5 py-0.5 rounded-md bg-[#1A202C] text-[#FF4F00] text-[10px] font-black">
-                          {v.combustible}
-                        </span>
-                        {v.isACActive && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 text-[10px] font-black">
-                            A/C
+                {viajesFiltrados.map((v) => {
+                  const isRepostaje = v.tipoRegistro === 'repostaje';
+                  const shortFuel = v.combustible === 'Gas LPG' ? 'LPG' : v.combustible === 'Diésel ON' ? 'Diésel' : 'Gasolina';
+                  return (
+                    <div
+                      key={v.id}
+                      className={`p-3.5 rounded-2xl border flex items-center justify-between shadow-sm transition ${
+                        isRepostaje
+                          ? 'bg-gradient-to-r from-emerald-950/30 to-[#121620] border-emerald-500/30'
+                          : 'bg-[#121620] border-slate-800/80'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-white flex items-center space-x-2">
+                          <span>{v.date || new Date(v.timestamp).toLocaleDateString('es-ES')}</span>
+                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${
+                            isRepostaje
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                              : 'bg-[#1A202C] text-[#FF4F00]'
+                          }`}>
+                            {isRepostaje ? `⛽ Repostaje ${shortFuel}` : shortFuel}
                           </span>
-                        )}
+                          {v.isACActive && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 text-[10px] font-black">
+                              A/C
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {isRepostaje ? (
+                            <span>
+                              +{v.litros.toFixed(2)} L @ {v.precioLitro.toFixed(2)} {currency}/L
+                              {v.estacion ? ` • ${v.estacion}` : ''}
+                            </span>
+                          ) : (
+                            <span>
+                              {v.km.toFixed(2)} km • {v.litros.toFixed(2)} L
+                              {v.durationSeconds ? ` • ${formatTime(v.durationSeconds)}` : ''}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {v.km.toFixed(2)} km • {v.litros.toFixed(2)} L
-                        {v.durationSeconds ? ` • ${formatTime(v.durationSeconds)}` : ''}
-                      </div>
-                    </div>
 
-                    <div className="text-right">
-                      <div className="text-sm font-black font-sans text-[#FF4F00]">
-                        {v.costo.toFixed(2)} {currency}
+                      <div className="text-right">
+                        <div className={`text-sm font-black font-sans ${
+                          isRepostaje ? 'text-emerald-400' : 'text-[#FF4F00]'
+                        }`}>
+                          {isRepostaje ? `+${v.costo.toFixed(2)}` : `${v.costo.toFixed(2)}`} {currency}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2583,8 +2711,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL SELECCIONAR / CALIBRAR VEHÍCULO Y MOTORIZACIÓN INVESTIGADA ---------------- */}
       {showVehicleModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl shadow-2xl h-[82dvh] max-h-[580px] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[200] flex flex-col justify-between sm:justify-center items-center p-3 sm:p-4 pb-20 sm:pb-6 bg-black/85 backdrop-blur-md overflow-hidden animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-5.5rem)] sm:max-h-[580px] overflow-hidden">
             {/* Header Fijo */}
             <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#111622]">
               <div className="flex items-center space-x-2.5">
@@ -2736,7 +2864,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             </div>
 
             {/* Footer Fijo y Permanente (Siempre visible para guardar) */}
-            <div className="p-4 pb-[max(env(safe-area-inset-bottom,0px),16px)] sm:pb-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2.5 z-10">
+            <div className="p-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex space-x-2.5 z-20 shadow-2xl">
               <button
                 type="button"
                 onClick={handleCancelVehicleModal}

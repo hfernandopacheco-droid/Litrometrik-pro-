@@ -1067,9 +1067,30 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
           localStorage.setItem('litrometrik_base_fuel_balance_pln', nextTankBal.toString());
         } catch (_) {}
 
-        // 2. Guardar último tanqueo para el aviso de Saldo Restante
+        // 2. Guardar último tanqueo para el aviso de Saldo Restante y sincronizar con historial_viajes
         localStorage.setItem('litrometrik_ultimo_tanqueo', JSON.stringify(newRecord));
         localStorage.setItem('litrometrik_active_fuel', targetFuelKey);
+
+        try {
+          const viajeRefuelEntry = {
+            id: newRecord.id,
+            timestamp: newRecord.createdAt || new Date().toISOString(),
+            date: (newRecord as any).refuelDate || new Date().toISOString().split('T')[0],
+            km: 0,
+            litros: refuelLitersNum,
+            costo: addedCost,
+            combustible: targetFuelKey,
+            precioLitro: refuelPrice,
+            moneda: activeCountryInfo.currency,
+            pais: selectedCountry,
+            vehicleType: 'sedan',
+            tipoRegistro: 'repostaje',
+            estacion: refuelStation,
+          };
+          const currentTrips = JSON.parse(localStorage.getItem('historial_viajes') || '[]');
+          const updatedTrips = [viajeRefuelEntry, ...currentTrips.filter((x: any) => x.id !== viajeRefuelEntry.id)];
+          localStorage.setItem('historial_viajes', JSON.stringify(updatedTrips));
+        } catch (_) {}
 
         // 3. Obtener saldo actual global y sumar el nuevo repostaje
         const currentBalanceStr = localStorage.getItem('litrometrik_fuel_balance_pln') ||
