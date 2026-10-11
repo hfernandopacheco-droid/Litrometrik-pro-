@@ -1388,16 +1388,23 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     setBaseConsumptionL100(modalTempBaseL100);
     setTransmission(modalTempTransmission);
 
+    const cat = UNIFIED_VEHICLE_CATALOG[modalTempVehicleType] || UNIFIED_VEHICLE_CATALOG.sedan;
+    const matchEng = cat.engines.find((e) => e.name === modalTempEngineName) || cat.engines[0];
+    const engineShort = (matchEng.name.match(/\d+\.\d+L/) || [])[0] || matchEng.name.split(' ')[0];
+    const modelName = `${cat.shortLabel} (${engineShort})`;
+
     saveActiveVehicleState({
       vehicleType: modalTempVehicleType as any,
-      engineName: modalTempEngineName,
+      engineKey: matchEng.key,
+      engineName: matchEng.name,
+      displacement: matchEng.displacement,
       baseL100: modalTempBaseL100,
       transmission: modalTempTransmission,
-      vehicleModelName: modalTempVehicleModelName || undefined,
+      vehicleModelName: modelName,
     });
 
     setShowVehicleModal(false);
-    setNotification(`🚗 Vehículo calibrado: ${modalTempEngineName} (${modalTempBaseL100} L/100km base)`);
+    setNotification(`🚗 Vehículo calibrado: ${modelName} • ${matchEng.name} (${modalTempBaseL100} L/100km base)`);
     setTimeout(() => setNotification(null), 3000);
   };
 
@@ -2012,111 +2019,133 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
         {/* ---------------- 4 CAMPOS INTEGRADOS CON ESTILO MÁS GORDITO, NÚMEROS MÁS GRANDES Y CÍRCULO CENTRAL KM/H CON CRONÓMETRO ---------------- */}
         <div className="relative select-none">
-          {/* 2x2 Cluster de las 4 tarjetas envolviendo el velocímetro con bordes amarillos y diseño gordito bien centrado */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          {/* 2x2 Cluster de las 4 tarjetas envolviendo el velocímetro con estética original LitroMetrik Pro */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
             {/* Campo 1: DISTANCIA (Top-Left) */}
-            <div className="relative min-h-[148px] sm:min-h-[160px] p-4 rounded-[26px] rounded-br-[56px] bg-[#121620]/95 border-2 border-yellow-400 shadow-[0_8px_30px_rgba(0,0,0,0.6),0_0_15px_rgba(250,204,21,0.22)] flex flex-col items-center justify-center text-center overflow-hidden">
-              <span className="text-[11px] sm:text-xs font-black tracking-widest text-slate-400 uppercase">
-                DISTANCIA
-              </span>
-              <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-white tracking-tight my-1">
-                {distanceKm.toFixed(2).replace('.', ',')} <span className="text-xs sm:text-sm font-bold text-slate-400">km</span>
+            <div className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-tl-3xl rounded-tr-xl rounded-bl-xl rounded-br-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between text-left items-start overflow-hidden">
+              <div>
+                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase block">
+                  DISTANCIA
+                </span>
+                <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-white tracking-tight mt-1">
+                  {distanceKm.toFixed(2).replace('.', ',')} <span className="text-xs sm:text-sm font-bold text-slate-400">km</span>
+                </div>
               </div>
-              <p className="text-[11px] sm:text-xs text-slate-400 font-semibold">
+              <p className="text-[11px] text-slate-400 font-medium">
                 {(liveLiters * (distanceKm > 0 ? 1 : 0)).toFixed(2).replace('.', ',')} L mov.
               </p>
             </div>
 
             {/* Campo 2: CONSUMO EN VIVO (Top-Right) */}
-            <div className="relative min-h-[148px] sm:min-h-[160px] p-4 rounded-[26px] rounded-bl-[56px] bg-[#121620]/95 border-2 border-yellow-400 shadow-[0_8px_30px_rgba(0,0,0,0.6),0_0_15px_rgba(250,204,21,0.22)] flex flex-col items-center justify-center text-center overflow-hidden">
-              <span className="text-[11px] sm:text-xs font-black tracking-widest text-slate-400 uppercase">
-                CONSUMO EN VIVO
-              </span>
-              <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-white tracking-tight my-1">
-                {liveLiters.toFixed(3).replace('.', ',')} <span className="text-xs sm:text-sm font-bold text-slate-400">L</span>
+            <div className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-tr-3xl rounded-tl-xl rounded-br-xl rounded-bl-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between text-right items-end overflow-hidden">
+              <div>
+                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase block">
+                  CONSUMO EN VIVO
+                </span>
+                <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-white tracking-tight mt-1">
+                  {liveLiters.toFixed(3).replace('.', ',')} <span className="text-xs sm:text-sm font-bold text-slate-400">L</span>
+                </div>
               </div>
-              <div className="text-[11px] sm:text-xs font-semibold text-slate-300 truncate max-w-full px-1">
+              <div className="flex items-center justify-end">
                 {isRunning ? (
                   currentSpeed < 3 ? (
-                    <span className="text-amber-400 font-bold">
-                      Detenido ({activeFuel === 'Gas LPG' ? (isACActive ? '1,15' : '0,95') : (isACActive ? '1,00' : '0,80')} L/h)
+                    <span className="text-[10px] sm:text-[11px] text-amber-400 font-bold flex items-center space-x-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                      <span>Detenido ({activeFuel === 'Gas LPG' ? (isACActive ? '1,15' : '0,95') : (isACActive ? '1,00' : '0,80')} L/h)</span>
                     </span>
                   ) : (
-                    <span className="text-emerald-400 font-bold">
-                      {((baseConsumptionL100 * (transmission === 'automatic' ? 1.08 : 1.0) * (activeFuel === 'Gas LPG' ? 1.2 : activeFuel === 'Diésel ON' ? 0.85 : 1.0)) + (isACActive ? acAddonAmount : 0)).toFixed(1)} L/100km
+                    <span className="text-[10px] sm:text-[11px] text-emerald-400 font-bold flex items-center space-x-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span>En Movimiento ({((baseConsumptionL100 * (transmission === 'automatic' ? 1.08 : 1.0) * (activeFuel === 'Gas LPG' ? 1.2 : activeFuel === 'Diésel ON' ? 0.85 : 1.0)) + (isACActive ? acAddonAmount : 0)).toFixed(1)} L/100km)</span>
                     </span>
                   )
                 ) : (
-                  <span className="text-slate-400">En reposo</span>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    En reposo
+                  </p>
                 )}
               </div>
             </div>
 
-            {/* Campo 3: GASTO EN VIVO (Bottom-Left) */}
-            <div className="relative min-h-[148px] sm:min-h-[160px] p-4 rounded-[26px] rounded-tr-[56px] bg-[#121620]/95 border-2 border-yellow-400 shadow-[0_8px_30px_rgba(0,0,0,0.6),0_0_15px_rgba(250,204,21,0.22)] flex flex-col items-center justify-center text-center overflow-hidden">
+            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Alineado a la izquierda para respirar lejos del círculo */}
+            <div className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-bl-3xl rounded-tl-xl rounded-br-xl rounded-tr-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between text-left items-start overflow-hidden">
               <div className="flex items-center space-x-1.5">
-                <span className="text-[11px] sm:text-xs font-black tracking-widest text-slate-400 uppercase">
+                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase">
                   GASTO EN VIVO
                 </span>
-                <span className="text-xs">
-                  {activeFuel === 'Gas LPG' ? '🔥' : activeFuel === 'Diésel ON' ? '🛢️' : '⛽'}
+                <span className="text-[11px] font-bold text-slate-300 flex items-center space-x-1">
+                  <span>{activeFuel === 'Gas LPG' ? '🔥 LPG' : activeFuel === 'Diésel ON' ? '🛢️ Diésel' : '⛽ Gasolina'}</span>
                 </span>
               </div>
 
-              <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-yellow-400 tracking-tight my-1">
-                {liveCost.toFixed(2).replace('.', ',')} <span className="text-xs sm:text-sm font-bold text-slate-300">{currency}</span>
-              </div>
+              <div>
+                <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-[#FF5722] tracking-tight">
+                  {liveCost.toFixed(2).replace('.', ',')} <span className="text-xs sm:text-sm font-bold text-slate-300">{currency}</span>
+                </div>
 
-              <div className="text-[11px] sm:text-xs text-slate-400 font-semibold truncate max-w-full">
-                {activeFuel === 'Gas LPG' ? 'Gas LPG' : activeFuel === 'Diésel ON' ? 'Diésel ON' : 'Gasolina Pb95'}
+                <div className="text-[11px] text-slate-400 font-bold truncate mt-0.5">
+                  {activeFuel === 'Gas LPG' ? 'Combustible: Gas LPG' : activeFuel === 'Diésel ON' ? 'Combustible: Diésel ON' : 'Combustible: Gasolina Pb95'}
+                </div>
               </div>
             </div>
 
-            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) */}
+            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) - Alineado a la derecha lejos del círculo */}
             <div
               onClick={toggleAC}
-              className={`relative min-h-[148px] sm:min-h-[160px] p-4 rounded-[26px] rounded-tl-[56px] border-2 border-yellow-400 shadow-[0_8px_30px_rgba(0,0,0,0.6),0_0_15px_rgba(250,204,21,0.22)] transition-all duration-300 flex flex-col items-center justify-center text-center cursor-pointer select-none overflow-hidden ${
+              className={`relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-br-3xl rounded-tr-xl rounded-bl-xl rounded-tl-[52px] border transition-all duration-300 flex flex-col justify-between text-right items-end cursor-pointer select-none overflow-hidden ${
                 isACActive
-                  ? 'bg-gradient-to-br from-[#0B2138] via-[#0A1A2C] to-[#121620]'
-                  : 'bg-[#121620]/95'
+                  ? 'bg-gradient-to-br from-[#0B2138] via-[#0A1A2C] to-[#121620] border-cyan-400/80 shadow-[0_0_25px_rgba(0,212,255,0.2)] ring-1 ring-cyan-400/30'
+                  : 'bg-[#131927]/95 border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700'
               }`}
             >
-              <div className="flex items-center justify-center space-x-2">
-                <Snowflake
-                  className={`w-3.5 h-3.5 shrink-0 ${
-                    isACActive ? 'text-cyan-300 animate-spin' : 'text-slate-400'
-                  }`}
-                />
-                <span className="text-[11px] sm:text-xs font-black tracking-widest text-slate-400 uppercase">
-                  AIRE A/C
-                </span>
-                <div
-                  className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 shadow-inner shrink-0 ${
-                    isACActive ? 'bg-cyan-400 justify-end' : 'bg-slate-700 justify-start'
+              {/* Header con aire A/C y switch táctil simétrico a la derecha */}
+              <div className="flex items-center justify-end space-x-2 w-full">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl border text-[10px] font-black tracking-tight transition-all shadow-sm shrink-0 whitespace-nowrap ${
+                    isACActive
+                      ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-cyan-500/20'
+                      : 'bg-slate-800/90 border-slate-700/80 text-slate-300'
                   }`}
                 >
-                  <div className="w-3 h-3 rounded-full bg-white shadow-sm" />
+                  <Snowflake
+                    className={`w-3.5 h-3.5 shrink-0 ${
+                      isACActive ? 'text-cyan-300 animate-spin' : 'text-slate-400'
+                    }`}
+                  />
+                  <span>aire A/C</span>
+                </span>
+
+                {/* Tactile Switch Toggle */}
+                <div
+                  className={`w-8 h-4.5 rounded-full transition-colors flex items-center px-0.5 shadow-inner shrink-0 ${
+                    isACActive ? 'bg-[#00D4FF] justify-end' : 'bg-slate-700 justify-start'
+                  }`}
+                >
+                  <div className="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform" />
                 </div>
               </div>
 
-              <div className="my-1">
-                <span
-                  className={`text-2xl sm:text-3xl lg:text-4xl font-black font-sans tracking-tight ${
-                    isACActive ? 'text-cyan-400 drop-shadow-[0_0_10px_rgba(0,212,255,0.6)]' : 'text-slate-300'
+              <div>
+                <div className="flex items-baseline justify-end space-x-1">
+                  <span
+                    className={`text-2xl sm:text-3xl lg:text-4xl font-black font-sans tracking-tight transition-colors ${
+                      isACActive
+                        ? 'text-cyan-400 drop-shadow-[0_0_12px_rgba(0,212,255,0.6)]'
+                        : 'text-white'
+                    }`}
+                  >
+                    {isACActive ? `+${acAddonAmount.toFixed(1)}` : '0,0'}
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-400">L/100km</span>
+                </div>
+                <p
+                  className={`text-[10px] sm:text-[11px] font-bold mt-0.5 truncate text-right ${
+                    isACActive ? 'text-cyan-300' : 'text-slate-500'
                   }`}
                 >
-                  {isACActive ? `+${acAddonAmount.toFixed(1)}` : '0,0'}
-                </span>
-                <span className="text-xs sm:text-sm font-bold text-slate-400 ml-1">L/100</span>
+                  {isACActive ? `Compresor Activo (+${acAddonAmount.toFixed(1)} L/100)` : 'Compresor Apagado (0.0)'}
+                </p>
               </div>
-
-              <p
-                className={`text-[11px] sm:text-xs font-semibold truncate ${
-                  isACActive ? 'text-cyan-300' : 'text-slate-500'
-                }`}
-              >
-                {isACActive ? 'Compresor Activo' : 'Compresor Apagado'}
-              </p>
             </div>
           </div>
 
@@ -2126,12 +2155,12 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               type="button"
               onClick={toggleMarcha}
               title="Velocímetro GPS & Cronómetro (Toca para iniciar o pausar)"
-              className={`pointer-events-auto relative w-36 h-36 sm:w-40 sm:h-40 rounded-full flex flex-col items-center justify-center transition-all duration-300 cursor-pointer shadow-[0_16px_40px_rgba(0,0,0,0.95),0_0_0_6px_#080B11,0_0_24px_rgba(250,204,21,0.25)] active:scale-95 ${
+              className={`pointer-events-auto relative w-34 h-34 sm:w-38 sm:h-38 rounded-full flex flex-col items-center justify-center transition-all duration-300 cursor-pointer shadow-[0_16px_40px_rgba(0,0,0,0.95),0_0_0_6px_#080B11,0_0_24px_rgba(0,0,0,0.8)] active:scale-95 ${
                 isRunning
                   ? currentSpeed < 3
-                    ? 'bg-gradient-to-b from-[#261B0A] via-[#171106] to-[#0A0702] border-[3px] border-yellow-400 text-white shadow-[0_0_28px_rgba(245,158,11,0.4)]'
-                    : 'bg-gradient-to-b from-[#0F1E36] via-[#0A1628] to-[#050D18] border-[3px] border-yellow-400 text-white shadow-[0_0_28px_rgba(250,204,21,0.4)]'
-                  : 'bg-gradient-to-b from-[#1C2433] via-[#121824] to-[#080B11] border-[3px] border-yellow-400/90 hover:border-yellow-300 text-slate-200'
+                    ? 'bg-gradient-to-b from-[#261B0A] via-[#171106] to-[#0A0702] border-[3px] border-amber-500/90 text-white shadow-[0_0_28px_rgba(245,158,11,0.3)]'
+                    : 'bg-gradient-to-b from-[#0F1E36] via-[#0A1628] to-[#050D18] border-[3px] border-[#00D4FF]/90 text-white shadow-[0_0_28px_rgba(0,212,255,0.3)]'
+                  : 'bg-gradient-to-b from-[#1C2433] via-[#121824] to-[#080B11] border-[3px] border-slate-600/80 hover:border-[#00D4FF]/70 text-slate-200'
               }`}
             >
               {/* SVG Speedometer Gauge Arc */}
@@ -2708,8 +2737,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                         type="button"
                         onClick={() => {
                           setModalTempVehicleType(preset.type);
-                          setModalTempVehicleModelName(preset.label);
                           const defEng = preset.engines[1] || preset.engines[0];
+                          const engineShort = (defEng.name.match(/\d+\.\d+L/) || [])[0] || defEng.name.split(' ')[0];
+                          setModalTempVehicleModelName(`${preset.shortLabel} (${engineShort})`);
                           setModalTempEngineName(defEng.name);
                           setModalTempBaseL100(defEng.baseL100);
                         }}
@@ -2752,6 +2782,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                         onClick={() => {
                           setModalTempEngineName(eng.name);
                           setModalTempBaseL100(eng.baseL100);
+                          const cat = UNIFIED_VEHICLE_CATALOG[modalTempVehicleType] || UNIFIED_VEHICLE_CATALOG.sedan;
+                          const engineShort = (eng.name.match(/\d+\.\d+L/) || [])[0] || eng.name.split(' ')[0];
+                          setModalTempVehicleModelName(`${cat.shortLabel} (${engineShort})`);
                         }}
                         className={`w-full p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between active:scale-98 ${
                           isSel

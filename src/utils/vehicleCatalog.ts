@@ -313,18 +313,31 @@ export function getActiveVehicleState(): ActiveVehicleState {
     const defaultEng = category.engines[1] || category.engines[0];
 
     const engineKey = localStorage.getItem('litrometrik_active_engine_key') || defaultEng.key;
-    const foundEng = category.engines.find((e) => e.key === engineKey) || defaultEng;
+    const engineName = localStorage.getItem('litrometrik_active_engine_name');
+
+    // Buscar motor concordante por nombre primero para que coincida perfectamente con el panel de marcha
+    const foundEng =
+      (engineName ? category.engines.find((e) => e.name === engineName) : null) ||
+      category.engines.find((e) => e.key === engineKey) ||
+      defaultEng;
 
     const storedBase = parseFloat(localStorage.getItem('litrometrik_active_base_l100') || '');
     const baseL100 = !isNaN(storedBase) && storedBase > 0 ? storedBase : foundEng.baseL100;
 
-    const engineName = localStorage.getItem('litrometrik_active_engine_name') || foundEng.name;
+    const resolvedEngineName = engineName || foundEng.name;
     const transmission = (localStorage.getItem('litrometrik_active_transmission') || 'manual') as 'manual' | 'automatic';
 
-    const vehicleModelName =
+    const rawVehicleModelName =
       localStorage.getItem('litrometrik_user_vehicle_model') ||
-      localStorage.getItem('litrometrik_active_vehicle_model') ||
-      `${category.shortLabel} (${engineName.split(' ')[0]})`;
+      localStorage.getItem('litrometrik_active_vehicle_model');
+
+    const engineDisplacementShort = (resolvedEngineName.match(/\d+\.\d+L/) || [])[0] || resolvedEngineName.split(' ')[0];
+    const defaultModelName = `${category.shortLabel} (${engineDisplacementShort})`;
+
+    const vehicleModelName =
+      rawVehicleModelName && !rawVehicleModelName.startsWith(category.shortLabel + ' (')
+        ? rawVehicleModelName
+        : defaultModelName;
 
     const carPhotoUrl =
       localStorage.getItem('litrometrik_car_photo') ||
@@ -338,8 +351,8 @@ export function getActiveVehicleState(): ActiveVehicleState {
 
     return {
       vehicleType: vType,
-      engineKey,
-      engineName,
+      engineKey: foundEng.key,
+      engineName: resolvedEngineName,
       displacement: foundEng.displacement,
       baseL100,
       transmission,
@@ -350,12 +363,12 @@ export function getActiveVehicleState(): ActiveVehicleState {
   } catch (_) {
     return {
       vehicleType: 'sedan',
-      engineKey: 'sedan_20_skyactiv',
-      engineName: '1.8L - 2.0L TSI / Skyactiv-G Confort',
-      displacement: '1.984 - 1.998 cc • 16V Inyección Directa',
-      baseL100: 8.2,
+      engineKey: 'sedan_16_mpi',
+      engineName: '1.6L MPI / VVT 16V Eficiente',
+      displacement: '1.598 cc • 4 Cilindros DOHC',
+      baseL100: 7.2,
       transmission: 'manual',
-      vehicleModelName: 'Sedán Mediano 2.0L',
+      vehicleModelName: 'Sedán (1.6L)',
       carPhotoUrl: null,
       fuelType: 'Gasolina',
     };
@@ -369,6 +382,25 @@ export function getActiveVehicleState(): ActiveVehicleState {
 export function saveActiveVehicleState(partial: Partial<ActiveVehicleState>): ActiveVehicleState {
   const current = getActiveVehicleState();
   const next: ActiveVehicleState = { ...current, ...partial };
+
+  const category = UNIFIED_VEHICLE_CATALOG[next.vehicleType] || UNIFIED_VEHICLE_CATALOG.sedan;
+  const matchEng =
+    category.engines.find((e) => e.name === next.engineName) ||
+    category.engines.find((e) => e.key === next.engineKey) ||
+    category.engines[0];
+
+  if (matchEng) {
+    next.engineKey = matchEng.key;
+    next.displacement = matchEng.displacement;
+    if (!partial.baseL100) {
+      next.baseL100 = matchEng.baseL100;
+    }
+  }
+
+  const engineDisplacementShort = (next.engineName.match(/\d+\.\d+L/) || [])[0] || next.engineName.split(' ')[0];
+  if (!partial.vehicleModelName || partial.vehicleModelName.includes('(')) {
+    next.vehicleModelName = `${category.shortLabel} (${engineDisplacementShort})`;
+  }
 
   try {
     localStorage.setItem('litrometrik_active_vehicle_type', next.vehicleType);

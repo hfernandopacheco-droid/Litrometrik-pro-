@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   X, User, LogOut, Mail, Eye, EyeOff, Lock, CheckCircle2,
-  AlertCircle, ShieldCheck, KeyRound, Sparkles
+  AlertCircle, ShieldCheck, KeyRound, Sparkles, ChevronDown
 } from 'lucide-react';
 import { signOutSupabase, supabase } from '../utils/supabaseClient';
 import { performSignOut, performChangePassword } from '../utils/firebaseAuth';
@@ -27,6 +27,7 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   const [confirmSignOut, setConfirmSignOut] = useState(false);
 
@@ -148,120 +149,140 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
             </div>
           </div>
 
-          {/* OPCIÓN DIRECTA PARA CAMBIAR CONTRASEÑA */}
-          <div className="p-4 rounded-2xl bg-[#0D131F] border border-slate-800 space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-xs font-black text-white">
-                <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <KeyRound className="w-3.5 h-3.5" />
+          {/* OPCIÓN PARA CAMBIAR CONTRASEÑA (DESPLEGABLE / COMPACTA POR DEFECTO) */}
+          <div className="rounded-2xl bg-[#0D131F] border border-slate-800 overflow-hidden transition-all">
+            <button
+              type="button"
+              onClick={() => setIsChangePasswordOpen(!isChangePasswordOpen)}
+              className="w-full p-3.5 sm:p-4 flex items-center justify-between text-left hover:bg-[#131A2A] transition cursor-pointer"
+            >
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  <KeyRound className="w-4 h-4" />
                 </div>
-                <span>Cambiar Contraseña</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-white flex items-center space-x-1.5 truncate">
+                    <span>Cambiar Contraseña</span>
+                    <span className="text-[10px] text-emerald-400 font-bold hidden sm:inline flex items-center space-x-1">
+                      <Sparkles className="w-3 h-3" />
+                      <span>Protección Cloud</span>
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    {isChangePasswordOpen ? 'Toca para ocultar' : 'Toca para desplegar opciones y actualizar clave'}
+                  </p>
+                </div>
               </div>
-              <span className="text-[10px] text-emerald-400 font-bold flex items-center space-x-1">
-                <Sparkles className="w-3 h-3" />
-                <span>Protección Cloud</span>
-              </span>
-            </div>
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2 ${
+                  isChangePasswordOpen ? 'rotate-180 text-emerald-400' : ''
+                }`}
+              />
+            </button>
 
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Si cambias tu contraseña, podrás cerrar e iniciar sesión con el mismo correo y tu nueva clave, encontrando toda tu información, vehículos y registros tal como los dejaste.
-            </p>
+            {isChangePasswordOpen && (
+              <div className="p-4 pt-1 border-t border-slate-800/80 space-y-3.5 animate-in fade-in duration-150">
+                <p className="text-[11px] text-slate-400 leading-relaxed pt-1.5">
+                  Si cambias tu contraseña, podrás cerrar e iniciar sesión con el mismo correo y tu nueva clave, encontrando toda tu información, vehículos y registros tal como los dejaste.
+                </p>
 
-            <form onSubmit={handleChangePasswordSubmit} className="space-y-3 pt-1">
-              {/* Nueva Contraseña */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  Nueva Contraseña
-                </label>
-                <div className="relative">
-                  <input
-                    type={showNewPass ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres..."
-                    className="w-full bg-[#161D2B] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 font-medium focus:outline-none focus:border-emerald-500 pr-10"
-                    required
-                  />
+                <form onSubmit={handleChangePasswordSubmit} className="space-y-3 pt-1">
+                  {/* Nueva Contraseña */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                      Nueva Contraseña
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNewPass ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Mínimo 6 caracteres..."
+                        className="w-full bg-[#161D2B] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 font-medium focus:outline-none focus:border-emerald-500 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPass(!showNewPass)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      >
+                        {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirmar Nueva Contraseña */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                      Confirmar Nueva Contraseña
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPass ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Repite la nueva contraseña..."
+                        className="w-full bg-[#161D2B] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 font-medium focus:outline-none focus:border-emerald-500 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPass(!showConfirmPass)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      >
+                        {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Checklist de Validación en Vivo */}
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-slate-800 text-[10px] space-y-1 text-slate-400">
+                    <div className="flex items-center space-x-1.5">
+                      <span className={newPassword.length >= 6 ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
+                        {newPassword.length >= 6 ? '✓' : '•'} Mínimo 6 caracteres
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className={newPassword && newPassword === confirmPassword ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
+                        {newPassword && newPassword === confirmPassword ? '✓' : '•'} Ambas contraseñas coinciden exactamente
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mensaje de Error */}
+                  {passwordError && (
+                    <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center space-x-2 animate-in fade-in">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                      <span>{passwordError}</span>
+                    </div>
+                  )}
+
+                  {/* Mensaje de Éxito */}
+                  {passwordSuccess && (
+                    <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center space-x-2 animate-in fade-in">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                      <span>{passwordSuccess}</span>
+                    </div>
+                  )}
+
+                  {/* Botón de Enviar */}
                   <button
-                    type="button"
-                    onClick={() => setShowNewPass(!showNewPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    type="submit"
+                    disabled={passwordLoading || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black text-xs transition flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/25 cursor-pointer active:scale-98"
                   >
-                    {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {passwordLoading ? (
+                      <span>Actualizando contraseña en la nube...</span>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Guardar y Actualizar Contraseña</span>
+                      </>
+                    )}
                   </button>
-                </div>
+                </form>
               </div>
-
-              {/* Confirmar Nueva Contraseña */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  Confirmar Nueva Contraseña
-                </label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPass ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repite la nueva contraseña..."
-                    className="w-full bg-[#161D2B] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 font-medium focus:outline-none focus:border-emerald-500 pr-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPass(!showConfirmPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                  >
-                    {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Checklist de Validación en Vivo */}
-              <div className="p-2.5 rounded-xl bg-black/40 border border-slate-800 text-[10px] space-y-1 text-slate-400">
-                <div className="flex items-center space-x-1.5">
-                  <span className={newPassword.length >= 6 ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
-                    {newPassword.length >= 6 ? '✓' : '•'} Mínimo 6 caracteres
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className={newPassword && newPassword === confirmPassword ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
-                    {newPassword && newPassword === confirmPassword ? '✓' : '•'} Ambas contraseñas coinciden exactamente
-                  </span>
-                </div>
-              </div>
-
-              {/* Mensaje de Error */}
-              {passwordError && (
-                <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center space-x-2 animate-in fade-in">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                  <span>{passwordError}</span>
-                </div>
-              )}
-
-              {/* Mensaje de Éxito */}
-              {passwordSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center space-x-2 animate-in fade-in">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                  <span>{passwordSuccess}</span>
-                </div>
-              )}
-
-              {/* Botón de Enviar */}
-              <button
-                type="submit"
-                disabled={passwordLoading || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black text-xs transition flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/25 cursor-pointer active:scale-98"
-              >
-                {passwordLoading ? (
-                  <span>Actualizando contraseña en la nube...</span>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Guardar y Actualizar Contraseña</span>
-                  </>
-                )}
-              </button>
-            </form>
+            )}
           </div>
         </div>
 
