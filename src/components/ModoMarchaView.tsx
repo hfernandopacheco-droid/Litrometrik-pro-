@@ -51,6 +51,8 @@ import {
   UnifiedVehicleCategory,
   getActiveVehicleState,
   saveActiveVehicleState,
+  formatFuelEconomy,
+  getFuelDisplayName,
 } from '../utils/vehicleCatalog';
 import {
   Sedan3D,
@@ -393,6 +395,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const [showSaveSegmentConfirmModal, setShowSaveSegmentConfirmModal] = useState<boolean>(false);
   const [pendingFuelTarget, setPendingFuelTarget] = useState<FuelKey | null>(null);
   const [pendingFuelPriceInput, setPendingFuelPriceInput] = useState<string>('');
+
+  // Interactive Explanatory Modals for 4 Cluster Cards & Engine Info
+  const [selectedClusterCardInfo, setSelectedClusterCardInfo] = useState<'distancia' | 'consumo' | 'gasto' | 'rendimiento' | null>(null);
+  const [selectedEngineForInfo, setSelectedEngineForInfo] = useState<UnifiedEngineSpec | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('litrometrik_active_trip');
@@ -2007,7 +2013,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   )}
                 </div>
                 <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
-                  {baseConsumptionL100.toFixed(1)} L/100km base • {transmission === 'automatic' ? 'Automático' : 'Manual'}
+                  {formatFuelEconomy(baseConsumptionL100, selectedCountry)} base • {transmission === 'automatic' ? 'Automático' : 'Manual'}
                   {isACActive ? ' • A/C Encendido' : ' • Modo Eco'}
                 </p>
               </div>
@@ -2019,12 +2025,16 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
         {/* ---------------- 4 CAMPOS INTEGRADOS CON ESTILO MÁS GORDITO, NÚMEROS MÁS GRANDES Y CÍRCULO CENTRAL KM/H CON CRONÓMETRO ---------------- */}
         <div className="relative select-none">
-          {/* 2x2 Cluster de las 4 tarjetas envolviendo el velocímetro con estética original LitroMetrik Pro */}
+          {/* 2x2 Cluster de las 4 tarjetas envolviendo el velocímetro con interactividad y estética LitroMetrik Pro */}
           <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
-            {/* Campo 1: DISTANCIA (Top-Left) */}
-            <div className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-tl-3xl rounded-tr-xl rounded-bl-xl rounded-br-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between text-left items-start overflow-hidden">
+            {/* Campo 1: DISTANCIA (Top-Left) - Clickeable con información interactiva */}
+            <div
+              onClick={() => setSelectedClusterCardInfo('distancia')}
+              title="Toca para ver explicación de Distancia"
+              className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-tl-3xl rounded-tr-xl rounded-bl-xl rounded-br-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-left items-start overflow-hidden group"
+            >
               <div>
-                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase block">
+                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase block group-hover:text-sky-400 transition">
                   DISTANCIA
                 </span>
                 <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-white tracking-tight mt-1">
@@ -2036,10 +2046,14 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </p>
             </div>
 
-            {/* Campo 2: CONSUMO EN VIVO (Top-Right) */}
-            <div className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-tr-3xl rounded-tl-xl rounded-br-xl rounded-bl-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between text-right items-end overflow-hidden">
+            {/* Campo 2: CONSUMO EN VIVO (Top-Right) - Clickeable con información interactiva */}
+            <div
+              onClick={() => setSelectedClusterCardInfo('consumo')}
+              title="Toca para ver explicación de Consumo en Vivo"
+              className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-tr-3xl rounded-tl-xl rounded-br-xl rounded-bl-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-right items-end overflow-hidden group"
+            >
               <div>
-                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase block">
+                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase block group-hover:text-sky-400 transition">
                   CONSUMO EN VIVO
                 </span>
                 <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-white tracking-tight mt-1">
@@ -2067,14 +2081,22 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Alineado a la izquierda para respirar lejos del círculo */}
-            <div className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-bl-3xl rounded-tl-xl rounded-br-xl rounded-tr-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] flex flex-col justify-between text-left items-start overflow-hidden">
+            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Clickeable con información interactiva */}
+            <div
+              onClick={() => setSelectedClusterCardInfo('gasto')}
+              title="Toca para ver explicación de Gasto en Vivo"
+              className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-bl-3xl rounded-tl-xl rounded-br-xl rounded-tr-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-left items-start overflow-hidden group"
+            >
               <div className="flex items-center space-x-1.5">
-                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase">
+                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase group-hover:text-[#FF5722] transition">
                   GASTO EN VIVO
                 </span>
                 <span className="text-[11px] font-bold text-slate-300 flex items-center space-x-1">
-                  <span>{activeFuel === 'Gas LPG' ? '🔥 LPG' : activeFuel === 'Diésel ON' ? '🛢️ Diésel' : '⛽ Gasolina'}</span>
+                  <span>
+                    {activeFuel === 'Gas LPG'
+                      ? selectedCountry === 'CO' || selectedCountry === 'MX' ? '🔥 Gas GLP' : '🔥 LPG'
+                      : activeFuel === 'Diésel ON' ? '🛢️ Diésel' : '⛽ Gasolina'}
+                  </span>
                 </span>
               </div>
 
@@ -2084,27 +2106,33 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 </div>
 
                 <div className="text-[11px] text-slate-400 font-bold truncate mt-0.5">
-                  {activeFuel === 'Gas LPG' ? 'Combustible: Gas LPG' : activeFuel === 'Diésel ON' ? 'Combustible: Diésel ON' : 'Combustible: Gasolina Pb95'}
+                  Combustible: {getFuelDisplayName(activeFuel, selectedCountry)}
                 </div>
               </div>
             </div>
 
-            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) - Alineado a la derecha lejos del círculo */}
+            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) - Clickeable (A/C con e.stopPropagation) */}
             <div
-              onClick={toggleAC}
-              className={`relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-br-3xl rounded-tr-xl rounded-bl-xl rounded-tl-[52px] border transition-all duration-300 flex flex-col justify-between text-right items-end cursor-pointer select-none overflow-hidden ${
+              onClick={() => setSelectedClusterCardInfo('rendimiento')}
+              title="Toca la tarjeta para ver explicación de Rendimiento y A/C"
+              className={`relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-br-3xl rounded-tr-xl rounded-bl-xl rounded-tl-[52px] border transition-all duration-300 flex flex-col justify-between text-right items-end cursor-pointer select-none overflow-hidden group ${
                 isACActive
                   ? 'bg-gradient-to-br from-[#0B2138] via-[#0A1A2C] to-[#121620] border-cyan-400/80 shadow-[0_0_25px_rgba(0,212,255,0.2)] ring-1 ring-cyan-400/30'
-                  : 'bg-[#131927]/95 border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700'
+                  : 'bg-[#131927]/95 border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98]'
               }`}
             >
-              {/* Header con aire A/C y switch táctil simétrico a la derecha */}
+              {/* Header con aire A/C y switch táctil simétrico a la derecha con e.stopPropagation() */}
               <div className="flex items-center justify-end space-x-2 w-full">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl border text-[10px] font-black tracking-tight transition-all shadow-sm shrink-0 whitespace-nowrap ${
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleAC();
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl border text-[10px] font-black tracking-tight transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer ${
                     isACActive
                       ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-cyan-500/20'
-                      : 'bg-slate-800/90 border-slate-700/80 text-slate-300'
+                      : 'bg-slate-800/90 border-slate-700/80 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
                   <Snowflake
@@ -2113,11 +2141,15 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                     }`}
                   />
                   <span>aire A/C</span>
-                </span>
+                </button>
 
                 {/* Tactile Switch Toggle */}
                 <div
-                  className={`w-8 h-4.5 rounded-full transition-colors flex items-center px-0.5 shadow-inner shrink-0 ${
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleAC();
+                  }}
+                  className={`w-8 h-4.5 rounded-full transition-colors flex items-center px-0.5 shadow-inner shrink-0 cursor-pointer ${
                     isACActive ? 'bg-[#00D4FF] justify-end' : 'bg-slate-700 justify-start'
                   }`}
                 >
@@ -2136,14 +2168,18 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   >
                     {isACActive ? `+${acAddonAmount.toFixed(1)}` : '0,0'}
                   </span>
-                  <span className="text-xs sm:text-sm font-bold text-slate-400">L/100km</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-400">
+                    {selectedCountry === 'CO' || selectedCountry === 'MX' ? 'km/L' : 'L/100km'}
+                  </span>
                 </div>
                 <p
                   className={`text-[10px] sm:text-[11px] font-bold mt-0.5 truncate text-right ${
                     isACActive ? 'text-cyan-300' : 'text-slate-500'
                   }`}
                 >
-                  {isACActive ? `Compresor Activo (+${acAddonAmount.toFixed(1)} L/100)` : 'Compresor Apagado (0.0)'}
+                  {isACActive
+                    ? `Compresor Activo (+${acAddonAmount.toFixed(1)} ${selectedCountry === 'CO' || selectedCountry === 'MX' ? 'L/h' : 'L/100'})`
+                    : 'Compresor Apagado (0.0)'}
                 </p>
               </div>
             </div>
@@ -2756,7 +2792,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                           {preset.shortLabel}
                         </div>
                         <div className="text-[9px] text-sky-400 font-mono font-bold">
-                          {preset.defaultBaseL100} L/100
+                          {formatFuelEconomy(preset.defaultBaseL100, selectedCountry)}
                         </div>
                       </button>
                     );
@@ -2774,34 +2810,51 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                     UNIFIED_VEHICLE_CATALOG[modalTempVehicleType]?.engines ||
                     UNIFIED_VEHICLE_CATALOG.sedan.engines
                   ).map((eng) => {
-                    const isSel = modalTempEngineName === eng.name;
+                    const isSel = modalTempEngineName === (eng.nombreComun || eng.name);
                     return (
-                      <button
-                        key={eng.key}
-                        type="button"
+                      <div
+                        key={eng.key || eng.id}
                         onClick={() => {
-                          setModalTempEngineName(eng.name);
-                          setModalTempBaseL100(eng.baseL100);
+                          setModalTempEngineName(eng.nombreComun || eng.name);
+                          setModalTempBaseL100(eng.consumoBaseL100 || eng.baseL100);
                           const cat = UNIFIED_VEHICLE_CATALOG[modalTempVehicleType] || UNIFIED_VEHICLE_CATALOG.sedan;
-                          const engineShort = (eng.name.match(/\d+\.\d+L/) || [])[0] || eng.name.split(' ')[0];
-                          setModalTempVehicleModelName(`${cat.shortLabel} (${engineShort})`);
+                          setModalTempVehicleModelName(`${cat.shortLabel} (${eng.nombreComun || eng.name})`);
                         }}
-                        className={`w-full p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between active:scale-98 ${
+                        className={`w-full p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between active:scale-[0.99] select-none ${
                           isSel
                             ? 'bg-gradient-to-r from-sky-500/20 to-blue-600/20 border-sky-400 text-white shadow-sm'
                             : 'bg-[#161D2B] border-slate-700/70 text-slate-300 hover:bg-[#1E2738]'
                         }`}
                       >
                         <div className="min-w-0 flex-1 pr-2">
-                          <div className="text-xs font-black truncate text-white">{eng.name}</div>
-                          <div className="text-[10px] text-slate-400 truncate mt-0.5">{eng.displacement} • {eng.powerCV}</div>
-                          <div className="text-[9px] text-slate-500 truncate mt-0.5">{eng.description}</div>
+                          <div className="text-xs font-black truncate text-white">{eng.nombreComun || eng.name}</div>
+                          <div className="text-[10px] text-slate-400 truncate mt-0.5">{eng.cc || eng.displacement} • {eng.cilindrosPotencia || eng.powerCV}</div>
+                          <div className="text-[9px] text-slate-500 truncate mt-0.5">{eng.descripcionBreve || eng.description}</div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <span className="font-mono text-sky-400 font-black text-xs block">{eng.baseL100.toFixed(1)}</span>
-                          <span className="text-[9px] text-slate-500">L/100km</span>
+
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <div className="text-right">
+                            <span className="font-mono text-sky-400 font-black text-xs block">
+                              {formatFuelEconomy(eng.consumoBaseL100 || eng.baseL100, selectedCountry)}
+                            </span>
+                          </div>
+
+                          {/* Botón de Información (?) con stopPropagation */}
+                          {eng.detalleInfo && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEngineForInfo(eng);
+                              }}
+                              className="w-6 h-6 rounded-full bg-slate-800 hover:bg-sky-500/30 border border-slate-700 hover:border-sky-400 text-slate-300 hover:text-sky-300 text-xs font-black flex items-center justify-center transition cursor-pointer shadow-sm active:scale-90"
+                              title="Ver ficha técnica y detalles"
+                            >
+                              ?
+                            </button>
+                          )}
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -3256,6 +3309,155 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 Guardar Nivel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Emergente Informativo de las 4 Tarjetas Alrededor del Velocímetro */}
+      {selectedClusterCardInfo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#131927] border border-slate-700/80 rounded-3xl p-6 max-w-sm w-full shadow-2xl relative space-y-4">
+            <button
+              type="button"
+              onClick={() => setSelectedClusterCardInfo(null)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {selectedClusterCardInfo === 'distancia' && (
+              <div className="space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                  <Gauge className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-black text-white">Distancia Recorrida</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Mide los kilómetros totales recorridos por GPS durante este viaje desde que presionaste 'Iniciar Marcha'. Abajo muestra cuántos litros de combustible se consumieron exclusivamente con el vehículo en movimiento.
+                </p>
+              </div>
+            )}
+
+            {selectedClusterCardInfo === 'consumo' && (
+              <div className="space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Fuel className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-black text-white">Litros Consumidos en Total</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Muestra el volumen exacto de combustible quemado durante este trayecto. En reposo (auto encendido pero detenido en un semáforo o tráfico), calcula el gasto de ralentí por hora según la cilindrada de tu motor.
+                </p>
+              </div>
+            )}
+
+            {selectedClusterCardInfo === 'gasto' && (
+              <div className="space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#FF5722]/15 border border-[#FF5722]/30 flex items-center justify-center text-[#FF5722]">
+                  <span className="font-black text-base">{currency}</span>
+                </div>
+                <h3 className="text-base font-black text-white">Dinero Gastado en el Viaje</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Calcula en tiempo real cuánto te está costando el viaje actual en tu moneda local ({currency}, según el precio por litro que configuraste en tu último tanqueo). Se adapta al combustible activo ({getFuelDisplayName(activeFuel, selectedCountry)}).
+                </p>
+              </div>
+            )}
+
+            {selectedClusterCardInfo === 'rendimiento' && (
+              <div className="space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
+                  <Snowflake className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-black text-white">Rendimiento y Compresor de A/C</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {selectedCountry === 'CO' || selectedCountry === 'MX'
+                    ? `Muestra el rendimiento en tiempo real en km por litro (${currency}). El interruptor de Aire A/C suma una carga adicional de entre 0.4 y 0.8 L/h al compresor del motor para reflejar el gasto real cuando el aire está encendido.`
+                    : `Muestra el promedio de consumo en tiempo real en litros por cada 100 km (${currency}). El interruptor de Aire A/C suma una carga adicional de entre 0.4 y 0.8 L/h al compresor del motor para reflejar el gasto real cuando el aire está encendido.`}
+                </p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSelectedClusterCardInfo(null)}
+              className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-black text-xs shadow-md transition cursor-pointer active:scale-95"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Informativo Detallado del Motor (?) */}
+      {selectedEngineForInfo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#131927] border border-slate-700/80 rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                  Ficha Técnica de Motorización
+                </span>
+                <h3 className="text-base font-black text-white mt-1">
+                  {selectedEngineForInfo.nombreComun || selectedEngineForInfo.name}
+                </h3>
+                <p className="text-xs text-slate-400 font-medium">
+                  {selectedEngineForInfo.cc || selectedEngineForInfo.displacement} • {selectedEngineForInfo.cilindrosPotencia || selectedEngineForInfo.powerCV}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedEngineForInfo(null)}
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
+              <div className="text-[11px] font-bold text-slate-400">Rendimiento Base Investigado:</div>
+              <div className="text-sm font-black text-emerald-400">
+                {formatFuelEconomy(selectedEngineForInfo.consumoBaseL100 || selectedEngineForInfo.baseL100, selectedCountry)}
+              </div>
+              <p className="text-[11px] text-slate-300 mt-1">
+                {selectedEngineForInfo.descripcionBreve || selectedEngineForInfo.description}
+              </p>
+            </div>
+
+            {selectedEngineForInfo.detalleInfo && (
+              <div className="space-y-3 text-xs">
+                <div>
+                  <span className="font-black text-sky-400 block mb-0.5">Tipo de manejo que cubre:</span>
+                  <p className="text-slate-300 leading-relaxed">
+                    {selectedEngineForInfo.detalleInfo.tipoManejo}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="font-black text-amber-400 block mb-1">Ejemplos de autos en el mercado:</span>
+                  <ul className="space-y-1">
+                    {selectedEngineForInfo.detalleInfo.ejemplosAutos.map((auto, idx) => (
+                      <li key={idx} className="flex items-center space-x-1.5 text-slate-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                        <span>{auto}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <span className="font-black text-emerald-400 block mb-0.5">Rendimiento promedio y combustibles:</span>
+                  <p className="text-slate-300 leading-relaxed">
+                    {selectedEngineForInfo.detalleInfo.rendimientoYCombustible}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSelectedEngineForInfo(null)}
+              className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-black text-xs shadow-md transition cursor-pointer active:scale-95"
+            >
+              Cerrar
+            </button>
           </div>
         </div>
       )}

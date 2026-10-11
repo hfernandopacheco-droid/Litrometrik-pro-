@@ -47,6 +47,8 @@ import {
   UnifiedEngineSpec,
   getActiveVehicleState,
   saveActiveVehicleState,
+  formatFuelEconomy,
+  getFuelDisplayName,
 } from '../utils/vehicleCatalog';
 
 interface VehicleCatalogItem {
@@ -114,6 +116,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [cloudSaving, setCloudSaving] = useState(false);
   const [isEngineModalOpen, setIsEngineModalOpen] = useState(false);
+  const [selectedEngineForInfo, setSelectedEngineForInfo] = useState<UnifiedEngineSpec | null>(null);
 
   // Active vehicle and motor selection
   const activeVehicleKey = inputs.vehicleType || 'sedan';
@@ -424,7 +427,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-[#FF4F00]/15 text-[#FF4F00] border border-[#FF4F00]/30 shadow-sm">
-                Base: {calc.activeBaseConsumption.toFixed(1)} L/100km
+                Base: {formatFuelEconomy(calc.activeBaseConsumption, inputs.country)}
               </span>
             </div>
           </div>
@@ -471,10 +474,10 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-black text-white truncate">
-                  {currentCatalog.label} • {currentCatalog.engines.find((e) => e.key === selectedEngineKey)?.name || 'Motor Estándar'}
+                  {currentCatalog.label} • {currentCatalog.engines.find((e) => e.key === selectedEngineKey)?.nombreComun || currentCatalog.engines.find((e) => e.key === selectedEngineKey)?.name || 'Motor Estándar'}
                 </div>
                 <div className="text-[10px] text-slate-400 font-medium">
-                  Consumo base: <span className="text-[#FF4F00] font-bold">{calc.activeBaseConsumption.toFixed(1)} L/100km</span>
+                  Consumo base: <span className="text-[#FF4F00] font-bold">{formatFuelEconomy(calc.activeBaseConsumption, inputs.country)}</span>
                 </div>
               </div>
             </div>
@@ -1225,10 +1228,10 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                     {modalCatalog.label} Seleccionado
                   </span>
                   <div className="text-sm font-black text-white">
-                    {modalCatalog.label} • {modalCatalog.engines.find((e) => e.key === selectedEngineKey)?.name || modalCatalog.engines[0]?.name}
+                    {modalCatalog.label} • {modalCatalog.engines.find((e) => e.key === selectedEngineKey)?.nombreComun || modalCatalog.engines.find((e) => e.key === selectedEngineKey)?.name || modalCatalog.engines[0]?.nombreComun || modalCatalog.engines[0]?.name}
                   </div>
                   <div className="text-xs text-slate-400">
-                    Consumo base: <strong className="text-white">{calc.activeBaseConsumption.toFixed(1)} L/100km</strong>
+                    Consumo base: <strong className="text-white">{formatFuelEconomy(calc.activeBaseConsumption, inputs.country)}</strong>
                   </div>
                 </div>
                 <div className="w-20 h-14 flex items-center justify-center shrink-0">
@@ -1240,52 +1243,70 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
               <div className="space-y-2">
                 <div className="text-xs font-black text-slate-300 flex items-center justify-between">
                   <span>Opciones de Cilindrada para {modalCatalog.label}:</span>
-                  <span className="text-[10px] text-slate-500">Toca una opción</span>
+                  <span className="text-[10px] text-slate-500">Toca una opción o (?) para ver detalles</span>
                 </div>
 
                 <div className="space-y-2">
                   {modalCatalog.engines.map((eng) => {
                     const isSelected = selectedEngineKey === eng.key;
                     return (
-                      <button
-                        key={eng.key}
-                        type="button"
+                      <div
+                        key={eng.key || eng.id}
                         onClick={() => handleSelectEngine(eng)}
-                        className={`w-full p-3.5 rounded-2xl text-left border transition-all cursor-pointer flex items-center justify-between active:scale-98 ${
+                        className={`w-full p-3.5 rounded-2xl text-left border transition-all cursor-pointer flex items-center justify-between active:scale-[0.99] select-none ${
                           isSelected
                             ? 'border-[#00D4FF] bg-[#00D4FF]/10 text-white shadow-[0_0_14px_rgba(0,212,255,0.25)]'
                             : 'border-slate-800 bg-[#080B11] text-slate-400 hover:text-slate-200 hover:border-slate-700'
                         }`}
                       >
-                        <div className="pr-2">
+                        <div className="pr-2 min-w-0 flex-1">
                           <div className="text-xs font-black text-white flex items-center space-x-2">
-                            <span>{eng.name}</span>
+                            <span className="truncate">{eng.nombreComun || eng.name}</span>
                             {isSelected && (
-                              <span className="px-2 py-0.2 rounded-full bg-[#00D4FF] text-slate-950 font-black text-[9px] uppercase">
+                              <span className="px-2 py-0.2 rounded-full bg-[#00D4FF] text-slate-950 font-black text-[9px] uppercase shrink-0">
                                 Activo
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-300 font-medium mt-0.5">
-                            {eng.displacement}
+                          <div className="text-[11px] text-slate-300 font-medium mt-0.5 truncate">
+                            {eng.cc || eng.displacement} • {eng.cilindrosPotencia || eng.powerCV}
                           </div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">
-                            {eng.description}
+                          <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                            {eng.descripcionBreve || eng.description}
                           </div>
                         </div>
 
-                        <div className="shrink-0 text-right">
-                          <span
-                            className={`text-xs font-black px-2.5 py-1 rounded-xl block ${
-                              isSelected
-                                ? 'bg-[#00D4FF] text-slate-950 font-black shadow-sm'
-                                : 'bg-slate-800 text-slate-300'
-                            }`}
-                          >
-                            {eng.key === 'custom' ? `${calc.activeBaseConsumption.toFixed(1)} L` : `${eng.baseL100} L/100km`}
-                          </span>
+                        <div className="shrink-0 flex items-center space-x-2">
+                          <div className="text-right">
+                            <span
+                              className={`text-xs font-black px-2.5 py-1 rounded-xl block ${
+                                isSelected
+                                  ? 'bg-[#00D4FF] text-slate-950 font-black shadow-sm'
+                                  : 'bg-slate-800 text-slate-300'
+                              }`}
+                            >
+                              {eng.key === 'custom' || eng.id === 'custom_direct'
+                                ? formatFuelEconomy(calc.activeBaseConsumption, inputs.country)
+                                : formatFuelEconomy(eng.consumoBaseL100 || eng.baseL100, inputs.country)}
+                            </span>
+                          </div>
+
+                          {/* Botón de Información (?) con stopPropagation */}
+                          {eng.detalleInfo && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEngineForInfo(eng);
+                              }}
+                              className="w-6 h-6 rounded-full bg-slate-800 hover:bg-[#00D4FF]/25 border border-slate-700 hover:border-[#00D4FF] text-slate-300 hover:text-[#00D4FF] text-xs font-black flex items-center justify-center transition cursor-pointer shadow-sm active:scale-90"
+                              title="Ver ficha técnica y detalles"
+                            >
+                              ?
+                            </button>
+                          )}
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1353,6 +1374,81 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                 <span>Guardar Cambios</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Informativo Detallado del Motor (?) */}
+      {selectedEngineForInfo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#131927] border border-slate-700/80 rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30">
+                  Ficha Técnica de Motorización
+                </span>
+                <h3 className="text-base font-black text-white mt-1">
+                  {selectedEngineForInfo.nombreComun || selectedEngineForInfo.name}
+                </h3>
+                <p className="text-xs text-slate-400 font-medium">
+                  {selectedEngineForInfo.cc || selectedEngineForInfo.displacement} • {selectedEngineForInfo.cilindrosPotencia || selectedEngineForInfo.powerCV}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedEngineForInfo(null)}
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
+              <div className="text-[11px] font-bold text-slate-400">Rendimiento Base Investigado:</div>
+              <div className="text-sm font-black text-emerald-400">
+                {formatFuelEconomy(selectedEngineForInfo.consumoBaseL100 || selectedEngineForInfo.baseL100, inputs.country)}
+              </div>
+              <p className="text-[11px] text-slate-300 mt-1">
+                {selectedEngineForInfo.descripcionBreve || selectedEngineForInfo.description}
+              </p>
+            </div>
+
+            {selectedEngineForInfo.detalleInfo && (
+              <div className="space-y-3 text-xs">
+                <div>
+                  <span className="font-black text-[#00D4FF] block mb-0.5">Tipo de manejo que cubre:</span>
+                  <p className="text-slate-300 leading-relaxed">
+                    {selectedEngineForInfo.detalleInfo.tipoManejo}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="font-black text-amber-400 block mb-1">Ejemplos de autos en el mercado:</span>
+                  <ul className="space-y-1">
+                    {selectedEngineForInfo.detalleInfo.ejemplosAutos.map((auto, idx) => (
+                      <li key={idx} className="flex items-center space-x-1.5 text-slate-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                        <span>{auto}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <span className="font-black text-emerald-400 block mb-0.5">Rendimiento promedio y combustibles:</span>
+                  <p className="text-slate-300 leading-relaxed">
+                    {selectedEngineForInfo.detalleInfo.rendimientoYCombustible}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSelectedEngineForInfo(null)}
+              className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-black text-xs shadow-md transition cursor-pointer active:scale-95"
+            >
+              Cerrar
+            </button>
           </div>
         </div>
       )}

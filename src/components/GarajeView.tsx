@@ -32,6 +32,7 @@ import {
   saveActiveVehicleState,
   UNIFIED_VEHICLE_CATALOG,
   ActiveVehicleState,
+  formatFuelEconomy,
 } from '../utils/vehicleCatalog';
 import { Sedan3D, Suv3D, Compacto3D, Pickup3D, Van3D, Custom3D } from './Vehicle3DIcons';
 
@@ -643,7 +644,7 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
                   {carPhoto ? 'Foto Real de tu Vehículo' : 'Vehículo Calibrado'}
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-300 font-bold">
-                  {activeVehicle.baseL100.toFixed(1)} L/100km
+                  {formatFuelEconomy(activeVehicle.baseL100, selectedCountry)}
                 </span>
               </div>
               <span className="text-[10px] text-slate-400 font-mono">

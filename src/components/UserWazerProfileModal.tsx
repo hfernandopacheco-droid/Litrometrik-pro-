@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   X, ArrowLeft, User, Award, Shield, Volume2, AlertTriangle, Fuel,
   Check, Sparkles, MapPin, Shuffle, Camera, Upload, Trash2, Car,
-  Globe, Gauge, CheckCircle2, Lock, Key, Eye, EyeOff, ShieldCheck, AlertCircle
+  Globe, Gauge, CheckCircle2, Lock, Key, Eye, EyeOff, ShieldCheck, AlertCircle,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { DATA_PAIS, CountryCode, CarModelSpec } from '../utils/countryData';
 import { getStoredActiveUser, updateActiveUserProfile, performChangePassword } from '../utils/firebaseAuth';
@@ -36,6 +37,9 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
     const saved = localStorage.getItem('litrometrik_user_fuel');
     return saved === 'GLP' ? 'LPG' : (saved || 'LPG');
   });
+
+  // Collapsible toggle to keep driver profile window neat and compact
+  const [isVehicleConfigExpanded, setIsVehicleConfigExpanded] = useState(false);
 
   // Waze Navigation preferences
   const [defaultRouting, setDefaultRouting] = useState(() => localStorage.getItem('wazer_routing') || 'fastest');
@@ -371,161 +375,196 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
           </div>
         </div>
 
-        {/* Vehicle Specification & Country Catalog */}
+        {/* Vehicle Specification & Country Catalog - Reducido y desplegable bajo demanda */}
         <div className="p-6 rounded-[28px] bg-[#141628]/80 backdrop-blur-xl border border-white/10 shadow-2xl space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center space-x-2">
               <Car className="w-4 h-4 text-violet-400" />
-              <span>Vehículo & Motor por País (Telemetría en Vivo)</span>
+              <span>Vehículo & Motor por País</span>
             </h2>
-            <span className="text-xs text-emerald-400 font-bold">100% Sincronizado</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Country Selector */}
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                País de Operación
-              </label>
-              <select
-                value={country}
-                onChange={(e) => handleCountryChange(e.target.value as CountryCode)}
-                className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
-                style={{
-                  backgroundColor: '#14141F',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                }}
-              >
-                <option value="PL">🇵🇱 Polonia (PLN - Złoty)</option>
-                <option value="ES">🇪🇸 España (EUR - Euro)</option>
-                <option value="CO">🇨🇴 Colombia (COP - Peso)</option>
-                <option value="MX">🇲🇽 México (MXN - Peso)</option>
-              </select>
-            </div>
-
-            {/* Vehicle Type */}
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                Tipo de Carrocería
-              </label>
-              <select
-                value={vehicleType}
-                onChange={(e) => setVehicleType(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
-                style={{
-                  backgroundColor: '#14141F',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                }}
-              >
-                <option value="compact">🚗 Compacto / Urbano (1.0-1.4L)</option>
-                <option value="sedan">🚘 Sedán / Berlina (1.4-2.0L)</option>
-                <option value="suv">🚙 SUV / Crossover (1.6-3.0L)</option>
-                <option value="pickup">🛻 Pickup / Camioneta 4x4 (2.4-4.0L)</option>
-                <option value="van">🚐 Furgoneta / Utilitario</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Car Catalog Dropdown */}
-          <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
-              <span>Modelos de Carros en {currentCountryInfo.nombre} con Cilindraje</span>
-              <span className="text-emerald-400 text-xs font-bold">{availableCars.length} autos en catálogo</span>
-            </label>
-            <select
-              value={selectedCarId}
-              onChange={(e) => handleCarModelSelect(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
-              style={{
-                backgroundColor: '#14141F',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-              }}
+            <button
+              type="button"
+              onClick={() => setIsVehicleConfigExpanded(!isVehicleConfigExpanded)}
+              className="px-3 py-1.5 rounded-xl bg-violet-600/30 hover:bg-violet-600/50 border border-violet-500/40 text-violet-200 text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer"
             >
-              <optgroup label={`Catálogo Popular en ${currentCountryInfo.nombre}`}>
-                {availableCars.map((car) => (
-                  <option key={car.id} value={car.id}>
-                    {car.brand} {car.model} — {car.engine} [{car.defaultFuel}]
-                  </option>
-                ))}
-              </optgroup>
-              <option value="custom">✏️ Personalizado / Otro modelo...</option>
-            </select>
+              <span>{isVehicleConfigExpanded ? 'Ocultar Opciones' : 'Configurar / Ver Opciones'}</span>
+              {isVehicleConfigExpanded ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
           </div>
 
-          {/* Custom Car Input when Personalizado / Otro is chosen */}
-          {selectedCarId === 'custom' && (
-            <div className="p-4 rounded-2xl bg-violet-950/40 border border-violet-500/40 space-y-2 animate-fadeIn">
-              <div className="text-xs font-black text-violet-300 flex items-center space-x-1.5">
-                <Car className="w-4 h-4 text-violet-400" />
-                <span>Agregar Carro Personalizado</span>
+          {/* Ficha Resumen Compacta (Visible siempre para no alargar la ventana) */}
+          <div className="p-3.5 rounded-2xl bg-[#0F111E] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-violet-500/20 text-violet-300 flex items-center justify-center shrink-0 text-sm font-bold">
+                🚗
               </div>
+              <div className="min-w-0">
+                <div className="text-xs font-black text-white truncate">
+                  {carModelName || 'Vehículo Activo'}
+                </div>
+                <div className="text-[10px] text-slate-400 truncate">
+                  {currentCountryInfo.nombre} • {vehicleType.toUpperCase()} • Motor {engineSize}L • {fuelType}
+                </div>
+              </div>
+            </div>
+            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shrink-0 self-start sm:self-center">
+              100% Sincronizado
+            </span>
+          </div>
+
+          {/* Opciones Detalladas Desplegables al Tocar */}
+          {isVehicleConfigExpanded && (
+            <div className="space-y-4 pt-2 border-t border-white/10 animate-in fade-in duration-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Country Selector */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    País de Operación
+                  </label>
+                  <select
+                    value={country}
+                    onChange={(e) => handleCountryChange(e.target.value as CountryCode)}
+                    className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
+                    style={{
+                      backgroundColor: '#14141F',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                    }}
+                  >
+                    <option value="PL">🇵🇱 Polonia (PLN - Złoty)</option>
+                    <option value="ES">🇪🇸 España (EUR - Euro)</option>
+                    <option value="CO">🇨🇴 Colombia (COP - Peso)</option>
+                    <option value="MX">🇲🇽 México (MXN - Peso)</option>
+                  </select>
+                </div>
+
+                {/* Vehicle Type */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    Tipo de Carrocería
+                  </label>
+                  <select
+                    value={vehicleType}
+                    onChange={(e) => setVehicleType(e.target.value)}
+                    className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
+                    style={{
+                      backgroundColor: '#14141F',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                    }}
+                  >
+                    <option value="compact">🚗 Compacto / Urbano (1.0-1.4L)</option>
+                    <option value="sedan">🚘 Sedán / Berlina (1.4-2.0L)</option>
+                    <option value="suv">🚙 SUV / Crossover (1.6-3.0L)</option>
+                    <option value="pickup">🛻 Pickup / Camioneta 4x4 (2.4-4.0L)</option>
+                    <option value="van">🚐 Furgoneta / Utilitario</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Car Catalog Dropdown */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Escribe la Marca y Modelo de tu Vehículo
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>Modelos de Carros en {currentCountryInfo.nombre} con Cilindraje</span>
+                  <span className="text-emerald-400 text-xs font-bold">{availableCars.length} autos en catálogo</span>
                 </label>
-                <input
-                  type="text"
-                  value={carModelName}
-                  onChange={(e) => setCarModelName(e.target.value)}
-                  placeholder="Ej: Mazda 6 2.5 Skyactiv-G, BMW X5, Audi RS3..."
-                  className="w-full px-4 py-2.5 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-violet-500 transition"
-                  style={{ backgroundColor: '#14141F', border: '1px solid rgba(255, 255, 255, 0.2)' }}
-                />
+                <select
+                  value={selectedCarId}
+                  onChange={(e) => handleCarModelSelect(e.target.value)}
+                  className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
+                  style={{
+                    backgroundColor: '#14141F',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                  }}
+                >
+                  <optgroup label={`Catálogo Popular en ${currentCountryInfo.nombre}`}>
+                    {availableCars.map((car) => (
+                      <option key={car.id} value={car.id}>
+                        {car.brand} {car.model} — {car.engine} [{car.defaultFuel}]
+                      </option>
+                    ))}
+                  </optgroup>
+                  <option value="custom">✏️ Personalizado / Otro modelo...</option>
+                </select>
+              </div>
+
+              {/* Custom Car Input when Personalizado / Otro is chosen */}
+              {selectedCarId === 'custom' && (
+                <div className="p-4 rounded-2xl bg-violet-950/40 border border-violet-500/40 space-y-2 animate-fadeIn">
+                  <div className="text-xs font-black text-violet-300 flex items-center space-x-1.5">
+                    <Car className="w-4 h-4 text-violet-400" />
+                    <span>Agregar Carro Personalizado</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Escribe la Marca y Modelo de tu Vehículo
+                    </label>
+                    <input
+                      type="text"
+                      value={carModelName}
+                      onChange={(e) => setCarModelName(e.target.value)}
+                      placeholder="Ej: Mazda 6, BMW X5, Audi A4, Chevrolet Aveo..."
+                      className="w-full px-4 py-2.5 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-violet-500 transition"
+                      style={{ backgroundColor: '#14141F', border: '1px solid rgba(255, 255, 255, 0.2)' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Engine Size & Fuel Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    Cilindraje de Motor
+                  </label>
+                  <select
+                    value={engineSize}
+                    onChange={(e) => setEngineSize(e.target.value)}
+                    className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
+                    style={{
+                      backgroundColor: '#14141F',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                    }}
+                  >
+                    <option value="1.0">⚡ 1.0L Económico</option>
+                    <option value="1.2">⚡ 1.2L Estándar</option>
+                    <option value="1.4">⚙️ 1.4L Urbano</option>
+                    <option value="1.6">⚙️ 1.6L Estándar</option>
+                    <option value="1.8">🚀 1.8L Mediano</option>
+                    <option value="2.0">🚀 2.0L Mediano</option>
+                    <option value="2.2">🏎️ 2.2L Diésel</option>
+                    <option value="2.5">🏎️ 2.5L Potente</option>
+                    <option value="3.0">🏎️ 3.0L V6</option>
+                    <option value="3.5">🔥 3.5L V6</option>
+                    <option value="4.0">🔥 4.0L+ V8 Potencia Alta</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    Combustible Activo
+                  </label>
+                  <select
+                    value={fuelType}
+                    onChange={(e) => setFuelType(e.target.value)}
+                    className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
+                    style={{
+                      backgroundColor: '#14141F',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                    }}
+                  >
+                    <option value="LPG">{country === 'CO' || country === 'MX' ? '🟢 Gas GLP' : '🟢 Gas LPG'}</option>
+                    <option value="Gasolina">🔵 Gasolina 95 / Pb95</option>
+                    <option value="Gasolina 98">⚡ Gasolina 98 Premium</option>
+                    <option value="Diésel">🟡 Diésel / ACPM</option>
+                    <option value="GNV">💨 Gas Natural GNV</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
-
-          {/* Engine Size & Fuel Type */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                Cilindraje de Motor
-              </label>
-              <select
-                value={engineSize}
-                onChange={(e) => setEngineSize(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
-                style={{
-                  backgroundColor: '#14141F',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                }}
-              >
-                <option value="1.0">⚡ 1.0L (3-Cilindros Económico)</option>
-                <option value="1.2">⚡ 1.2L PureTech / MPI</option>
-                <option value="1.4">⚙️ 1.4L TSI / Turbo</option>
-                <option value="1.5">⚙️ 1.5L TSI / Skyactiv-G</option>
-                <option value="1.6">⚙️ 1.6L MPI / MZR / LPG</option>
-                <option value="1.8">🚀 1.8L Hybrid / VVT-i</option>
-                <option value="2.0">🚀 2.0L Skyactiv / TDI / TSI</option>
-                <option value="2.2">🏎️ 2.2L Diésel CRDi / D-4D</option>
-                <option value="2.5">🏎️ 2.5L 4-Cilindros / Turbo</option>
-                <option value="3.0">🏎️ 3.0L - 3.3L 6-Cilindros / V6</option>
-                <option value="3.5">🔥 3.5L V6</option>
-                <option value="4.0">🔥 4.0L+ V8 Potencia Alta</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                Combustible Activo
-              </label>
-              <select
-                value={fuelType}
-                onChange={(e) => setFuelType(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl text-white text-xs font-bold focus:outline-none focus:border-violet-500 transition"
-                style={{
-                  backgroundColor: '#14141F',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                }}
-              >
-                <option value="LPG">🟢 Gas LPG / Autogás</option>
-                <option value="Gasolina">🔵 Gasolina 95 / Pb95</option>
-                <option value="Gasolina 98">⚡ Gasolina 98 Premium</option>
-                <option value="Diésel">🟡 Diésel / ACPM</option>
-                <option value="GNV">💨 Gas Natural GNV</option>
-              </select>
-            </div>
-          </div>
         </div>
 
         {/* 5. SEGURIDAD & CONTRASEÑA */}
