@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Fuel,
   Gauge,
@@ -322,6 +323,13 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     } catch (_) {}
     return 0;
   });
+  const [liveMovingLiters, setLiveMovingLiters] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('litrometrik_active_trip');
+      if (saved) return JSON.parse(saved).liveMovingLiters || 0;
+    } catch (_) {}
+    return 0;
+  });
 
   // Re-sync prices when country changes
   useEffect(() => {
@@ -397,7 +405,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const [pendingFuelPriceInput, setPendingFuelPriceInput] = useState<string>('');
 
   // Interactive Explanatory Modals for 4 Cluster Cards & Engine Info
-  const [selectedClusterCardInfo, setSelectedClusterCardInfo] = useState<'distancia' | 'consumo' | 'gasto' | 'rendimiento' | null>(null);
+  const [selectedClusterCardInfo, setSelectedClusterCardInfo] = useState<'distancia' | 'consumo' | 'gasto' | 'rendimiento' | 'tanque' | null>(null);
   const [selectedEngineForInfo, setSelectedEngineForInfo] = useState<UnifiedEngineSpec | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(() => {
     try {
@@ -626,6 +634,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     // 1. Reset telemetry values to 0
     setDistanceKm(0);
     setLiveLiters(0);
+    setLiveMovingLiters(0);
     setLiveCost(0);
     setElapsedSeconds(0);
     setMovingSeconds(0);
@@ -841,6 +850,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const lastTickTimeRef = useRef<number>(Date.now());
   const wakeLockSentinelRef = useRef<any>(null);
   const workerRef = useRef<Worker | null>(null);
+  const lastGpsPositionUpdateTimeRef = useRef<number>(0);
 
   // Sync refs for background calculations
   const isRunningRef = useRef<boolean>(isRunning);
@@ -872,6 +882,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
           isRunning,
           distanceKm,
           liveLiters,
+          liveMovingLiters,
           liveCost,
           elapsedSeconds,
           movingSeconds,
@@ -882,7 +893,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         })
       );
     } catch (_) {}
-  }, [isRunning, distanceKm, liveLiters, liveCost, elapsedSeconds, movingSeconds, idleSeconds, activeFuel, isACActive]);
+  }, [isRunning, distanceKm, liveLiters, liveMovingLiters, liveCost, elapsedSeconds, movingSeconds, idleSeconds, activeFuel, isACActive]);
 
   // Screen Wake Lock API
   const requestWakeLock = async () => {
@@ -935,9 +946,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         vehicleTypeRef.current === 'compact' ? 0.70 :
         vehicleTypeRef.current === 'suv' ? 1.10 : 0.85;
 
-      const fuelFactor = isLpg ? 1.18 : isDiesel ? 0.85 : 1.0;
-      // Compressor A/C adds +0.20 L/h load in idle
-      const acIdleAdd = isAC ? 0.20 : 0.0;
+      const fuelFactor = isLpg ? 1.20 : isDiesel ? 0.85 : 1.0;
+      // Compressor A/C adds +0.5 L/h load in idle (estricto según arquitectura)
+      const acIdleAdd = isAC ? 0.50 : 0.0;
       const idleRatePerHour = (baseIdleRate * fuelFactor) + acIdleAdd;
       const idleBurnedLiters = (idleRatePerHour / 3600) * deltaSec;
 
@@ -949,6 +960,25 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     } else {
       // EN MOVIMIENTO
       setMovingSeconds((prev) => prev + deltaSec);
+
+      // Sincronización continua de avance: si el GPS satelital no ha enviado delta en los últimos 1.5s
+      const now = Date.now();
+      if (now - lastGpsPositionUpdateTimeRef.current > 1500) {
+        const deltaKm = (speed * deltaSec) / 3600;
+        const transMult = transmissionRef.current === 'automatic' ? 1.08 : 1.0;
+        const fuelMult = isLpg ? 1.20 : isDiesel ? 0.85 : 1.0;
+        const acAdd = isAC ? 0.60 : 0.0;
+        const currentRateL100 = (baseConsumptionL100Ref.current * transMult * fuelMult) + acAdd;
+        const movingBurnedLiters = (deltaKm * currentRateL100) / 100;
+
+        setDistanceKm((prevKm) => prevKm + deltaKm);
+        setLiveMovingLiters((prevMov) => prevMov + movingBurnedLiters);
+        setLiveLiters((prevL) => {
+          const nextL = prevL + movingBurnedLiters;
+          setLiveCost(nextL * fuelPriceRef.current);
+          return nextL;
+        });
+      }
     }
   };
 
@@ -1107,6 +1137,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               );
 
               if (delta > 0.003 && delta < 2.0) {
+                lastGpsPositionUpdateTimeRef.current = now;
                 setDistanceKm((prevKm) => {
                   const nextKm = prevKm + delta;
                   updatedKm = nextKm;
@@ -1116,10 +1147,12 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   const fuelMult =
                     activeFuelRef.current === 'Gas LPG' ? 1.20 :
                     activeFuelRef.current === 'Diésel ON' ? 0.85 : 1.0;
-                  const acAdd = isACActiveRef.current ? acAddonAmountRef.current : 0.0;
+                  const acAdd = isACActiveRef.current ? 0.60 : 0.0;
                   const currentRateL100 = (baseConsumptionL100Ref.current * transMult * fuelMult) + acAdd;
 
                   const movingBurnedLiters = (delta * currentRateL100) / 100;
+
+                  setLiveMovingLiters((prevMov) => prevMov + movingBurnedLiters);
 
                   setLiveLiters((prevL) => {
                     const nextL = prevL + movingBurnedLiters;
@@ -1184,6 +1217,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     } catch (_) {}
 
     setDistanceKm(0);
+    setLiveMovingLiters(0);
     setLiveLiters(0);
     setLiveCost(0);
     setElapsedSeconds(0);
@@ -2042,7 +2076,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 </div>
               </div>
               <p className="text-[11px] text-slate-400 font-medium">
-                {(liveLiters * (distanceKm > 0 ? 1 : 0)).toFixed(2).replace('.', ',')} L mov.
+                {liveMovingLiters.toFixed(2).replace('.', ',')} L mov.
               </p>
             </div>
 
@@ -2065,12 +2099,32 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   currentSpeed < 3 ? (
                     <span className="text-[10px] sm:text-[11px] text-amber-400 font-bold flex items-center space-x-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                      <span>Detenido ({activeFuel === 'Gas LPG' ? (isACActive ? '1,15' : '0,95') : (isACActive ? '1,00' : '0,80')} L/h)</span>
+                      <span>
+                        En reposo / ralentí (
+                        {(
+                          (vehicleType === 'compact' ? 0.70 : vehicleType === 'suv' ? 1.10 : 0.85) *
+                            (activeFuel === 'Gas LPG' ? 1.20 : activeFuel === 'Diésel ON' ? 0.85 : 1.0) +
+                          (isACActive ? 0.50 : 0.0)
+                        )
+                          .toFixed(1)
+                          .replace('.', ',')}{' '}
+                        L/h)
+                      </span>
                     </span>
                   ) : (
                     <span className="text-[10px] sm:text-[11px] text-emerald-400 font-bold flex items-center space-x-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      <span>En Movimiento ({((baseConsumptionL100 * (transmission === 'automatic' ? 1.08 : 1.0) * (activeFuel === 'Gas LPG' ? 1.2 : activeFuel === 'Diésel ON' ? 0.85 : 1.0)) + (isACActive ? acAddonAmount : 0)).toFixed(1)} L/100km)</span>
+                      <span>
+                        En movimiento (
+                        {formatFuelEconomy(
+                          baseConsumptionL100 *
+                            (transmission === 'automatic' ? 1.08 : 1.0) *
+                            (activeFuel === 'Gas LPG' ? 1.20 : activeFuel === 'Diésel ON' ? 0.85 : 1.0) +
+                            (isACActive ? 0.60 : 0.0),
+                          selectedCountry
+                        )}
+                        )
+                      </span>
                     </span>
                   )
                 ) : (
@@ -2111,10 +2165,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* Campo 4: SWITCH DE AIRE ACONDICIONADO A/C (Bottom-Right) - Clickeable (A/C con e.stopPropagation) */}
+            {/* Campo 4: RITMO INSTANTÁNEO Y A/C (Bottom-Right) - Clickeable (A/C con e.stopPropagation) */}
             <div
               onClick={() => setSelectedClusterCardInfo('rendimiento')}
-              title="Toca la tarjeta para ver explicación de Rendimiento y A/C"
+              title="Toca la tarjeta para ver explicación de Ritmo Instantáneo y A/C"
               className={`relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-br-3xl rounded-tr-xl rounded-bl-xl rounded-tl-[52px] border transition-all duration-300 flex flex-col justify-between text-right items-end cursor-pointer select-none overflow-hidden group ${
                 isACActive
                   ? 'bg-gradient-to-br from-[#0B2138] via-[#0A1A2C] to-[#121620] border-cyan-400/80 shadow-[0_0_25px_rgba(0,212,255,0.2)] ring-1 ring-cyan-400/30'
@@ -2158,6 +2212,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
 
               <div>
+                {/* Consumo Instantáneo en Marcha / Ralentí */}
                 <div className="flex items-baseline justify-end space-x-1">
                   <span
                     className={`text-2xl sm:text-3xl lg:text-4xl font-black font-sans tracking-tight transition-colors ${
@@ -2166,10 +2221,38 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                         : 'text-white'
                     }`}
                   >
-                    {isACActive ? `+${acAddonAmount.toFixed(1)}` : '0,0'}
+                    {(() => {
+                      if (!isRunning) {
+                        return '0,0';
+                      }
+                      if (currentSpeed < 3) {
+                        // Ralentí detenido en L/h
+                        const idleLh =
+                          (vehicleType === 'compact' ? 0.70 : vehicleType === 'suv' ? 1.10 : 0.85) *
+                            (activeFuel === 'Gas LPG' ? 1.20 : activeFuel === 'Diésel ON' ? 0.85 : 1.0) +
+                          (isACActive ? 0.50 : 0.0);
+                        return idleLh.toFixed(1).replace('.', ',');
+                      }
+                      // En marcha: nunca 0,0 mientras el coche ruede
+                      const movingRateL100 =
+                        baseConsumptionL100 *
+                          (transmission === 'automatic' ? 1.08 : 1.0) *
+                          (activeFuel === 'Gas LPG' ? 1.20 : activeFuel === 'Diésel ON' ? 0.85 : 1.0) +
+                        (isACActive ? 0.60 : 0.0);
+
+                      if (selectedCountry === 'CO' || selectedCountry === 'MX') {
+                        const kmPerLiter = movingRateL100 > 0 ? 100 / movingRateL100 : 0;
+                        return kmPerLiter.toFixed(1).replace('.', ',');
+                      }
+                      return movingRateL100.toFixed(1).replace('.', ',');
+                    })()}
                   </span>
                   <span className="text-xs sm:text-sm font-bold text-slate-400">
-                    {selectedCountry === 'CO' || selectedCountry === 'MX' ? 'km/L' : 'L/100km'}
+                    {isRunning && currentSpeed < 3
+                      ? 'L/h'
+                      : selectedCountry === 'CO' || selectedCountry === 'MX'
+                      ? 'km/L'
+                      : 'L/100km'}
                   </span>
                 </div>
                 <p
@@ -2178,7 +2261,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   }`}
                 >
                   {isACActive
-                    ? `Compresor Activo (+${acAddonAmount.toFixed(1)} ${selectedCountry === 'CO' || selectedCountry === 'MX' ? 'L/h' : 'L/100'})`
+                    ? `Compresor Activo (+0.6 L/100 • +0.5 L/h)`
+                    : isRunning && currentSpeed >= 3
+                    ? 'Ritmo Instantáneo (Eco)'
                     : 'Compresor Apagado (0.0)'}
                 </p>
               </div>
@@ -2332,6 +2417,32 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
           </div>
         </div>
 
+        {/* Simulador / Test de Velocidad GPS (Disponible cuando el cronómetro está en marcha) */}
+        {isRunning && (
+          <div className="flex items-center justify-between px-3 py-1.5 rounded-2xl bg-[#0F1420]/80 border border-slate-800/80 text-[10px] text-slate-400">
+            <span className="font-bold flex items-center space-x-1 text-slate-400">
+              <Navigation className="w-3 h-3 text-[#00D4FF]" />
+              <span>Simular GPS:</span>
+            </span>
+            <div className="flex items-center space-x-1.5">
+              {[0, 45, 80, 120].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setCurrentSpeed(s)}
+                  className={`px-2 py-0.5 rounded-lg border font-mono font-bold transition cursor-pointer active:scale-95 ${
+                    currentSpeed === s
+                      ? 'bg-[#00D4FF]/20 border-[#00D4FF] text-[#00D4FF]'
+                      : 'bg-slate-800/90 border-slate-700/80 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {s} km/h
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ---------------- 2 & 5. SALDO RESTANTE EN TANQUE CON DESCUENTO EN VIVO Y ALERTA DE RESERVA ---------------- */}
         <div
           className={`p-5 rounded-3xl transition-all duration-300 shadow-xl space-y-4 ${
@@ -2342,11 +2453,15 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         >
           {/* Header con tabs para cambiar entre Gasolina, LPG o Diésel y ver el saldo de cada uno */}
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="text-[11px] font-black tracking-widest text-slate-400 uppercase">
+            <div
+              onClick={() => setSelectedClusterCardInfo('tanque')}
+              className="flex items-center justify-between flex-wrap gap-2 cursor-pointer group"
+              title="Toca para ver explicación de Reserva de Tanque y Combustible Activo"
+            >
+              <span className="text-[11px] font-black tracking-widest text-slate-400 uppercase group-hover:text-amber-400 transition">
                 SALDO RESTANTE EN TANQUE
               </span>
-              <div className="flex items-center space-x-1 px-3 py-1 rounded-full bg-[#1A202C] border border-slate-700/80 text-xs font-sans font-bold text-slate-200">
+              <div className="flex items-center space-x-1 px-3 py-1 rounded-full bg-[#1A202C] border border-slate-700/80 text-xs font-sans font-bold text-slate-200 group-hover:border-amber-400/60 transition">
                 <span>💧</span>
                 <span>{currentRemainingLiters.toFixed(2).replace('.', ',')} L</span>
               </div>
@@ -2384,9 +2499,13 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
           </div>
 
           {/* Giant Amount - Orange or Glowing Red if in Reserve */}
-          <div className="flex items-baseline justify-between">
+          <div
+            onClick={() => setSelectedClusterCardInfo('tanque')}
+            className="flex items-baseline justify-between cursor-pointer group"
+            title="Toca para ver explicación de Reserva de Tanque y Combustible Activo"
+          >
             <div
-              className={`text-4xl sm:text-5xl font-black font-sans tracking-tight transition-colors ${
+              className={`text-4xl sm:text-5xl font-black font-sans tracking-tight transition-colors group-hover:brightness-110 ${
                 isReserveActive
                   ? 'text-red-400 drop-shadow-[0_0_15px_rgba(239,68,68,0.6)]'
                   : 'text-[#FF4F00]'
@@ -2735,7 +2854,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
       {/* ---------------- MODAL SELECCIONAR / CALIBRAR VEHÍCULO Y MOTORIZACIÓN INVESTIGADA ---------------- */}
       {showVehicleModal && (
-        <div className="fixed inset-0 z-[200] flex flex-col justify-between sm:justify-center items-center p-3 sm:p-4 pb-20 sm:pb-6 bg-black/85 backdrop-blur-md overflow-hidden animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[60] flex flex-col justify-between sm:justify-center items-center p-3 sm:p-4 pb-20 sm:pb-6 bg-black/85 backdrop-blur-md overflow-hidden animate-in fade-in duration-150">
           <div className="w-full max-w-md bg-[#111622] border border-slate-700 rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-5.5rem)] sm:max-h-[580px] overflow-hidden">
             {/* Header Fijo */}
             <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 shrink-0 bg-[#111622]">
@@ -3313,10 +3432,16 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         </div>
       )}
 
-      {/* Modal Emergente Informativo de las 4 Tarjetas Alrededor del Velocímetro */}
-      {selectedClusterCardInfo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-[#131927] border border-slate-700/80 rounded-3xl p-6 max-w-sm w-full shadow-2xl relative space-y-4">
+      {/* Modal Emergente Informativo de las 4 Tarjetas Alrededor del Velocímetro y del Tanque */}
+      {selectedClusterCardInfo && typeof document !== 'undefined' && createPortal(
+        <div
+          onClick={() => setSelectedClusterCardInfo(null)}
+          className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#131927] border border-slate-700/90 rounded-3xl p-6 max-w-sm w-full shadow-2xl relative space-y-4 animate-in zoom-in-95 duration-150"
+          >
             <button
               type="button"
               onClick={() => setSelectedClusterCardInfo(null)}
@@ -3330,9 +3455,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 <div className="w-11 h-11 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
                   <Gauge className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-black text-white">Distancia Recorrida</h3>
+                <h3 className="text-base font-black text-white">Distancia Recorrida y Movimiento</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Mide los kilómetros totales recorridos por GPS durante este viaje desde que presionaste 'Iniciar Marcha'. Abajo muestra cuántos litros de combustible se consumieron exclusivamente con el vehículo en movimiento.
+                  Mide la distancia exacta calculada por satélite GPS desde que iniciaste el trayecto. En la parte inferior registra cuántos litros de combustible gastó el motor exclusivamente mientras el auto estuvo rodando, descontando los momentos en que te detuviste en semáforos o atascos.
                 </p>
               </div>
             )}
@@ -3342,9 +3467,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                   <Fuel className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-black text-white">Litros Consumidos en Total</h3>
+                <h3 className="text-base font-black text-white">Litros Totales Consumidos</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Muestra el volumen exacto de combustible quemado durante este trayecto. En reposo (auto encendido pero detenido en un semáforo o tráfico), calcula el gasto de ralentí por hora según la cilindrada de tu motor.
+                  Es el acumulador de combustible quemado durante todo el viaje. Suma el combustible consumido al acelerar más el combustible consumido en ralentí (cuando el motor está encendido pero el vehículo permanece detenido). Conforme este número sube, se descuenta de forma idéntica de la gota de litros de tu tanque.
                 </p>
               </div>
             )}
@@ -3354,9 +3479,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 <div className="w-11 h-11 rounded-2xl bg-[#FF5722]/15 border border-[#FF5722]/30 flex items-center justify-center text-[#FF5722]">
                   <span className="font-black text-base">{currency}</span>
                 </div>
-                <h3 className="text-base font-black text-white">Dinero Gastado en el Viaje</h3>
+                <h3 className="text-base font-black text-white">Gasto Económico en Vivo</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Calcula en tiempo real cuánto te está costando el viaje actual en tu moneda local ({currency}, según el precio por litro que configuraste en tu último tanqueo). Se adapta al combustible activo ({getFuelDisplayName(activeFuel, selectedCountry)}).
+                  Convierte los litros consumidos a dinero real según el precio por litro configurado en tu último tanqueo. Refleja exactamente cuánto te está costando el viaje actual en tu moneda y se resta en vivo del saldo monetario de tu tanque.
                 </p>
               </div>
             )}
@@ -3366,11 +3491,21 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 <div className="w-11 h-11 rounded-2xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
                   <Snowflake className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-black text-white">Rendimiento y Compresor de A/C</h3>
+                <h3 className="text-base font-black text-white">Ritmo de Consumo Instantáneo y A/C</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  {selectedCountry === 'CO' || selectedCountry === 'MX'
-                    ? `Muestra el rendimiento en tiempo real en km por litro (${currency}). El interruptor de Aire A/C suma una carga adicional de entre 0.4 y 0.8 L/h al compresor del motor para reflejar el gasto real cuando el aire está encendido.`
-                    : `Muestra el promedio de consumo en tiempo real en litros por cada 100 km (${currency}). El interruptor de Aire A/C suma una carga adicional de entre 0.4 y 0.8 L/h al compresor del motor para reflejar el gasto real cuando el aire está encendido.`}
+                  Muestra la eficiencia del motor en cada segundo según tu velocidad y aceleración. Si estás en Europa se expresa en L/100km; si estás en Colombia/México se expresa en km/L. El interruptor de Aire A/C simula la carga mecánica del compresor en el motor (aproximadamente +0.6 L/100km en marcha o +0.5 L/h detenido).
+                </p>
+              </div>
+            )}
+
+            {selectedClusterCardInfo === 'tanque' && (
+              <div className="space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 text-lg">
+                  💧
+                </div>
+                <h3 className="text-base font-black text-white">Reserva de Tanque y Combustible Activo</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Muestra los litros físicos y el saldo en dinero que le quedan al combustible que tienes seleccionado (LPG, Gasolina o Diésel). Cuando estás conduciendo con LPG seleccionado, el gasto se descuenta únicamente del tanque de gas. Si cambias a Gasolina, los cálculos pasan a descontarse del tanque de gasolina.
                 </p>
               </div>
             )}
@@ -3383,13 +3518,20 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               Entendido
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal Informativo Detallado del Motor (?) */}
-      {selectedEngineForInfo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-[#131927] border border-slate-700/80 rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto">
+      {/* Modal Informativo Detallado del Motor (?) con Portal en z-[80] y backdrop independiente */}
+      {selectedEngineForInfo && typeof document !== 'undefined' && createPortal(
+        <div
+          onClick={() => setSelectedEngineForInfo(null)}
+          className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#131927] border border-slate-700/80 rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150"
+          >
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-400 border border-sky-500/30">
@@ -3459,7 +3601,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               Cerrar
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* User Profile & Supabase Account Info Modal */}
