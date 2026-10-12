@@ -117,8 +117,7 @@ export const CalculatorForm: React.FC<CalculatorFormProps> = ({ inputs, onChange
   const countries: { id: CountryCode; label: string; flag: string; currency: string }[] = [
     { id: 'PL', label: 'Polonia', flag: '🇵🇱', currency: 'PLN' },
     { id: 'CO', label: 'Colombia', flag: '🇨🇴', currency: 'COP' },
-    { id: 'ES', label: 'España', flag: '🇪🇸', currency: 'EUR' },
-    { id: 'MX', label: 'México', flag: '🇲🇽', currency: 'MXN' },
+    { id: 'US', label: 'Estados Unidos', flag: '🇺🇸', currency: 'USD' },
   ];
 
   return (

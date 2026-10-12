@@ -544,8 +544,7 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
   const countries = [
     { code: 'PL' as CountryCode, label: 'Polonia', flag: '🇵🇱' },
     { code: 'CO' as CountryCode, label: 'Colombia', flag: '🇨🇴' },
-    { code: 'ES' as CountryCode, label: 'España', flag: '🇪🇸' },
-    { code: 'MX' as CountryCode, label: 'México', flag: '🇲🇽' },
+    { code: 'US' as CountryCode, label: 'Estados Unidos', flag: '🇺🇸' },
   ];
 
   const currentCountry = countries.find((c) => c.code === selectedCountry) || countries[1];
@@ -630,7 +629,7 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
                   <span className="truncate">{activeVehicle.vehicleModelName || `${activeCar.brand} ${activeCar.model}`}</span>
                 </h2>
                 <p className="text-[10px] text-slate-400 font-medium truncate">
-                  {selectedCountry === 'CO' ? 'Placa: KLM-428 • Bogotá' : selectedCountry === 'ES' ? 'Matrícula: 4812-LBC • Madrid' : selectedCountry === 'MX' ? 'Placas: 924-ZPX • CDMX' : 'Rejestracja: KR-5821P'}
+                  {selectedCountry === 'CO' ? 'Placa: KLM-428 • Bogotá' : selectedCountry === 'US' ? 'Plate: 7XYZ89 • Florida' : 'Rejestracja: KR-5821P'}
                 </p>
               </div>
             </div>

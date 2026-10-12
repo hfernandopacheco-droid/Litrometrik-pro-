@@ -36,7 +36,7 @@ export const ResultsCard: React.FC<ResultsCardProps> = ({
       const stored = localStorage.getItem('litrometrik_refuel_threshold');
       if (stored) return parseFloat(stored);
     } catch (e) {}
-    return inputs.country === 'CO' ? 120000 : (inputs.country === 'MX' ? 500 : 120);
+    return inputs.country === 'CO' ? 120000 : (inputs.country === 'US' ? 35 : 120);
   });
   const [showThresholdSettings, setShowThresholdSettings] = useState(false);
 

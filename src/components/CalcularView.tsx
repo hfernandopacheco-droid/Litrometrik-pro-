@@ -43,7 +43,7 @@ interface CalcularViewProps {
 }
 
 import {
-  UNIFIED_VEHICLE_CATALOG,
+  getVehicleCatalogForCountry,
   UnifiedEngineSpec,
   getActiveVehicleState,
   saveActiveVehicleState,
@@ -59,50 +59,53 @@ interface VehicleCatalogItem {
   engines: UnifiedEngineSpec[];
 }
 
-const VEHICLE_CATALOG: Record<string, VehicleCatalogItem> = {
-  compact: {
-    type: 'compact',
-    label: UNIFIED_VEHICLE_CATALOG.compact.label,
-    renderIcon: (cls) => <Compacto3D className={cls} size={46} />,
-    defaultBase: UNIFIED_VEHICLE_CATALOG.compact.defaultBaseL100,
-    engines: UNIFIED_VEHICLE_CATALOG.compact.engines,
-  },
-  sedan: {
-    type: 'sedan',
-    label: UNIFIED_VEHICLE_CATALOG.sedan.label,
-    renderIcon: (cls) => <Sedan3D className={cls} size={46} />,
-    defaultBase: UNIFIED_VEHICLE_CATALOG.sedan.defaultBaseL100,
-    engines: UNIFIED_VEHICLE_CATALOG.sedan.engines,
-  },
-  suv: {
-    type: 'suv',
-    label: UNIFIED_VEHICLE_CATALOG.suv.label,
-    renderIcon: (cls) => <Suv3D className={cls} size={46} />,
-    defaultBase: UNIFIED_VEHICLE_CATALOG.suv.defaultBaseL100,
-    engines: UNIFIED_VEHICLE_CATALOG.suv.engines,
-  },
-  pickup: {
-    type: 'pickup',
-    label: UNIFIED_VEHICLE_CATALOG.pickup.label,
-    renderIcon: (cls) => <Pickup3D className={cls} size={46} />,
-    defaultBase: UNIFIED_VEHICLE_CATALOG.pickup.defaultBaseL100,
-    engines: UNIFIED_VEHICLE_CATALOG.pickup.engines,
-  },
-  van: {
-    type: 'van',
-    label: UNIFIED_VEHICLE_CATALOG.van.label,
-    renderIcon: (cls) => <Van3D className={cls} size={46} />,
-    defaultBase: UNIFIED_VEHICLE_CATALOG.van.defaultBaseL100,
-    engines: UNIFIED_VEHICLE_CATALOG.van.engines,
-  },
-  custom: {
-    type: 'custom',
-    label: UNIFIED_VEHICLE_CATALOG.custom.label,
-    renderIcon: (cls) => <Custom3D className={cls} size={46} />,
-    defaultBase: UNIFIED_VEHICLE_CATALOG.custom.defaultBaseL100,
-    engines: UNIFIED_VEHICLE_CATALOG.custom.engines,
-  },
-};
+function getVehicleCatalogForCountryItems(country: CountryCode = 'PL'): Record<string, VehicleCatalogItem> {
+  const cat = getVehicleCatalogForCountry(country);
+  return {
+    compact: {
+      type: 'compact',
+      label: cat.compact?.label || 'Compacto',
+      renderIcon: (cls) => <Compacto3D className={cls} size={46} />,
+      defaultBase: cat.compact?.defaultBaseL100 || 5.4,
+      engines: cat.compact?.engines || [],
+    },
+    sedan: {
+      type: 'sedan',
+      label: cat.sedan?.label || 'Sedán',
+      renderIcon: (cls) => <Sedan3D className={cls} size={46} />,
+      defaultBase: cat.sedan?.defaultBaseL100 || 7.2,
+      engines: cat.sedan?.engines || [],
+    },
+    suv: {
+      type: 'suv',
+      label: cat.suv?.label || 'SUV',
+      renderIcon: (cls) => <Suv3D className={cls} size={46} />,
+      defaultBase: cat.suv?.defaultBaseL100 || 9.2,
+      engines: cat.suv?.engines || [],
+    },
+    pickup: {
+      type: 'pickup',
+      label: cat.pickup?.label || 'Pickup',
+      renderIcon: (cls) => <Pickup3D className={cls} size={46} />,
+      defaultBase: cat.pickup?.defaultBaseL100 || 11.5,
+      engines: cat.pickup?.engines || [],
+    },
+    van: {
+      type: 'van',
+      label: cat.van?.label || 'Furgón',
+      renderIcon: (cls) => <Van3D className={cls} size={46} />,
+      defaultBase: cat.van?.defaultBaseL100 || 8.8,
+      engines: cat.van?.engines || [],
+    },
+    custom: {
+      type: 'custom',
+      label: cat.custom?.label || 'Personalizado',
+      renderIcon: (cls) => <Custom3D className={cls} size={46} />,
+      defaultBase: cat.custom?.defaultBaseL100 || 8.0,
+      engines: cat.custom?.engines || [],
+    },
+  };
+}
 
 export const CalcularView: React.FC<CalcularViewProps> = ({
   inputs,
@@ -117,6 +120,11 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
   const [cloudSaving, setCloudSaving] = useState(false);
   const [isEngineModalOpen, setIsEngineModalOpen] = useState(false);
   const [selectedEngineForInfo, setSelectedEngineForInfo] = useState<UnifiedEngineSpec | null>(null);
+
+  const VEHICLE_CATALOG = useMemo(
+    () => getVehicleCatalogForCountryItems(inputs.country || 'PL'),
+    [inputs.country]
+  );
 
   // Active vehicle and motor selection
   const activeVehicleKey = inputs.vehicleType || 'sedan';
@@ -197,8 +205,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
   const countries = [
     { code: 'PL' as CountryCode, label: 'Polonia', flag: '🇵🇱' },
     { code: 'CO' as CountryCode, label: 'Colombia', flag: '🇨🇴' },
-    { code: 'ES' as CountryCode, label: 'España', flag: '🇪🇸' },
-    { code: 'MX' as CountryCode, label: 'México', flag: '🇲🇽' },
+    { code: 'US' as CountryCode, label: 'Estados Unidos', flag: '🇺🇸' },
   ];
   const currentCountry = countries.find((c) => c.code === inputs.country) || countries[0];
 

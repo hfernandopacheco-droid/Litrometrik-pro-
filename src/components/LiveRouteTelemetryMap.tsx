@@ -54,8 +54,7 @@ interface LiveRouteTelemetryMapProps {
 const CAPITAL_CENTERS: Record<CountryCode, { lat: number; lng: number; city: string; startLabel: string }> = {
   PL: { lat: 52.2297, lng: 21.0122, city: 'Varsovia', startLabel: 'Varsovia Centro' },
   CO: { lat: 4.7110, lng: -74.0721, city: 'Bogotá', startLabel: 'Bogotá (Calle 26)' },
-  ES: { lat: 40.4168, lng: -3.7038, city: 'Madrid', startLabel: 'Madrid (Paseo de la Castellana)' },
-  MX: { lat: 19.4326, lng: -99.1332, city: 'Ciudad de México', startLabel: 'CDMX (Paseo de la Reforma)' },
+  US: { lat: 40.7128, lng: -74.0060, city: 'Nueva York', startLabel: 'New York (Broadway / Manhattan)' },
 };
 
 /**

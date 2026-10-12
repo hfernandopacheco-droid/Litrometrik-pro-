@@ -2,7 +2,7 @@ export type VehicleType = 'compact' | 'sedan' | 'suv' | 'van' | 'pickup' | 'cust
 export type TransmissionType = 'manual' | 'automatic';
 export type FuelType = 'gasolina' | 'diesel' | 'lpg' | 'glp' | 'hibrido' | 'gnc' | string;
 export type RouteType = 'carretera' | 'mixto' | 'ciudad';
-export type CountryCode = 'PL' | 'CO' | 'MX' | 'ES';
+export type CountryCode = 'PL' | 'CO' | 'US';
 
 export interface CalculatorInputs {
   country: CountryCode;

@@ -132,8 +132,8 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
   const currencySymbol = useMemo(() => {
     if (selectedCountry === 'PL') return 'PLN';
     if (selectedCountry === 'CO') return 'COP';
-    if (selectedCountry === 'ES') return 'EUR';
-    return 'MXN';
+    if (selectedCountry === 'US') return 'USD';
+    return 'PLN';
   }, [selectedCountry]);
 
   // ---------------- VEHICLE & ENGINE SPECIFICATION ----------------
@@ -241,12 +241,10 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
     if (selectedCountry === 'PL') {
       return isLpg ? 2.89 : gpsFuelType === 'Diésel' ? 6.15 : gpsFuelType === 'Gasolina 98' ? 6.95 : 6.45;
     } else if (selectedCountry === 'CO') {
-      return isLpg ? 2600 : gpsFuelType === 'GNV' ? 2400 : gpsFuelType === 'Diésel' ? 4400 : gpsFuelType === 'Gasolina 98' ? 4600 : 4200;
-    } else if (selectedCountry === 'ES') {
-      return isLpg ? 0.95 : gpsFuelType === 'Diésel' ? 1.45 : gpsFuelType === 'Gasolina 98' ? 1.72 : 1.58;
+      return isLpg ? 2400 : gpsFuelType === 'GNV' ? 2400 : gpsFuelType === 'Diésel' ? 4350 : 4200;
     } else {
-      // México (MX)
-      return isLpg ? 12.80 : gpsFuelType === 'Diésel' ? 24.50 : gpsFuelType === 'Gasolina 98' ? 25.40 : 23.80;
+      // Estados Unidos (US)
+      return isLpg ? 0.95 : gpsFuelType === 'Diésel' ? 1.05 : 0.92;
     }
   }, [selectedCountry, gpsFuelType]);
 
@@ -297,7 +295,7 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
   const handleSelectFuel = (fuel: 'LPG' | 'Gasolina' | 'Diésel') => {
     setGpsFuelType(fuel);
     const isLpg = fuel === 'LPG';
-    const price = customFuelPrices[fuel] || (selectedCountry === 'CO' ? (isLpg ? 2600 : fuel === 'Diésel' ? 4400 : 4200) : selectedCountry === 'ES' ? (isLpg ? 0.95 : fuel === 'Diésel' ? 1.45 : 1.58) : selectedCountry === 'MX' ? (isLpg ? 12.80 : fuel === 'Diésel' ? 24.50 : 23.80) : (isLpg ? 2.89 : fuel === 'Diésel' ? 6.15 : 6.45));
+    const price = customFuelPrices[fuel] || (selectedCountry === 'CO' ? (isLpg ? 2400 : fuel === 'Diésel' ? 4350 : 4200) : selectedCountry === 'US' ? (isLpg ? 0.95 : fuel === 'Diésel' ? 1.05 : 0.92) : (isLpg ? 2.89 : fuel === 'Diésel' ? 6.15 : 6.45));
     try {
       localStorage.setItem('litrometrik_active_fuel_type', fuel);
       localStorage.setItem('fuel_active_type', fuel);
@@ -318,7 +316,7 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
         if (!isNaN(val)) return val;
       }
     } catch (_) {}
-    return selectedCountry === 'CO' ? 100000 : selectedCountry === 'MX' ? 500 : 100;
+    return selectedCountry === 'CO' ? 100000 : selectedCountry === 'US' ? 40 : 100;
   });
 
   // Modal 1: Registrar Tanqueo (Monto pagado + Precio/Litro -> Litros recargados)
@@ -424,8 +422,7 @@ export const FuelStatisticsModal: React.FC<FuelStatisticsModalProps> = ({
     setFuelBalancePLN(newBalance);
 
     const defaultStation = selectedCountry === 'PL' ? 'Orlen' :
-                           selectedCountry === 'CO' ? 'Terpel' :
-                           selectedCountry === 'ES' ? 'Repsol' : 'Pemex';
+                           selectedCountry === 'CO' ? 'Terpel' : 'Chevron';
     const now = new Date();
     const calculatedLiters = activePrice > 0 ? Math.round((amount / activePrice) * 100) / 100 : 0;
 

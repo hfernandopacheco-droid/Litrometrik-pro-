@@ -1,4 +1,4 @@
-export type CountryCode = 'PL' | 'CO' | 'MX' | 'ES';
+export type CountryCode = 'PL' | 'CO' | 'US';
 
 export interface VehicleCategoryData {
   ejemplos: string;
@@ -90,7 +90,7 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
     unidadConsumo: 'L/100km',
     gasolineras: ['Orlen', 'BP Polska', 'Shell Polska', 'Circle K', 'Moya', 'Lotos', 'Amic Energy', 'Avia'],
     preciosDefecto: { gasolina: 6.09, diesel: 6.15, lpg: 2.89 },
-    etiquetasCombustible: { gasolina: 'Gasolina Pb95', diesel: 'Diésel ON', lpg: 'Gas LPG' },
+    etiquetasCombustible: { lpg: 'LPG / Autogaz', gasolina: 'Benzyna / Gasolina', diesel: 'Diesel / ON' },
     ciudadesRutasEjemplo: ['Varsovia a Cracovia (A4)', 'Gdansk a Varsovia (S7)', 'Wrocław a Poznań (S5)'],
     Compacto: {
       ejemplos: "Toyota Yaris, Fiat 500, Skoda Fabia",
@@ -212,10 +212,10 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
     bandera: '🇨🇴',
     moneda: 'COP',
     unidadPrecio: 'COP/L',
-    unidadConsumo: 'L/100km',
+    unidadConsumo: 'km/L',
     gasolineras: ['Terpel', 'Primax', 'Texaco', 'Biomax', 'Petromil', 'Mobil Colombia', 'Esso', 'Brio'],
     preciosDefecto: { gasolina: 4200, diesel: 4350, lpg: 2400 },
-    etiquetasCombustible: { gasolina: 'Gasolina Corriente', diesel: 'Diésel / ACPM', lpg: 'Gas GNV / LPG Vehicular' },
+    etiquetasCombustible: { lpg: 'Gas GLP / Gas Vehicular', gasolina: 'Gasolina Corriente / Extra', diesel: 'Diésel / ACPM' },
     ciudadesRutasEjemplo: ['Bogotá a Medellín (Autopista Medellín)', 'Cali a Buenaventura', 'Barranquilla a Cartagena (Vía al Mar)'],
     Compacto: {
       ejemplos: "Renault Kwid, Kia Picanto, Chevrolet Spark GT",
@@ -329,254 +329,130 @@ export const DATA_PAIS: Record<CountryCode, CountryInfo> = {
   },
 
   // =========================================================================
-  // 3. MÉXICO 🇲🇽
+  // 3. ESTADOS UNIDOS 🇺🇸
   // =========================================================================
-  MX: {
-    codigo: 'MX',
-    nombre: 'México',
-    bandera: '🇲🇽',
-    moneda: 'MXN',
-    unidadPrecio: 'MXN/L',
-    unidadConsumo: 'L/100km',
-    gasolineras: ['Pemex', 'OXXO Gas', 'BP México', 'Mobil México', 'Shell México', 'G500', 'Petro-7', 'TotalEnergies'],
-    preciosDefecto: { gasolina: 23.80, diesel: 24.50, lpg: 12.80 },
-    etiquetasCombustible: { gasolina: 'Gasolina Magna 87', diesel: 'Diésel', lpg: 'Gas LP Automotriz' },
-    ciudadesRutasEjemplo: ['CDMX a Querétaro (Autopista 57)', 'Guadalajara a Puerto Vallarta', 'Monterrey a Saltillo'],
+  US: {
+    codigo: 'US',
+    nombre: 'Estados Unidos',
+    bandera: '🇺🇸',
+    moneda: 'USD',
+    unidadPrecio: 'USD/L',
+    unidadConsumo: 'MPG',
+    gasolineras: ['Chevron', 'Shell US', 'ExxonMobil', 'BP America', 'Costco Gas', 'Texaco', 'Marathon', 'Sunoco'],
+    preciosDefecto: { gasolina: 0.95, diesel: 1.05, lpg: 0.70 },
+    etiquetasCombustible: { gasolina: 'Gasoline (Regular / Premium)', diesel: 'Diesel', lpg: 'LPG / Propane' },
+    ciudadesRutasEjemplo: ['New York a Boston (I-95)', 'Miami a Orlando (Turnpike)', 'Dallas a Houston (I-45)'],
     Compacto: {
-      ejemplos: "Nissan March, Chevrolet Aveo, Kia Rio",
-      motor: "1.2-1.6L",
-      consumo: "6.0-7.2",
+      ejemplos: "Honda Civic, Toyota Corolla, Mini Cooper, Chevy Bolt",
+      motor: "1.5-2.0L 4-Cyl",
+      consumo: "32-38 MPG (~6.5 L/100km)",
       base: 6.5,
-      min: 5.2,
+      min: 5.0,
       max: 8.0,
-      queEs: "Compacto / Urbano: Auto citadino ahorrador de combustible en el tráfico del periférico"
+      queEs: "Compact / Coupe: Auto ágil y eficiente para desplazamientos metropolitanos y bajo consumo"
     },
     Sedan: {
-      ejemplos: "Nissan Versa, VW Jetta, Nissan Sentra",
-      motor: "1.6-2.0L",
-      consumo: "7.8-9.5",
-      base: 8.5,
-      min: 6.8,
-      max: 10.5,
-      queEs: "Sedán / Mediano: Auto de 4 puertas con buen baúl y confort para autopista y familia"
+      ejemplos: "Toyota Camry, Honda Accord, Tesla Model 3, Hyundai Sonata",
+      motor: "2.0-2.5L 4-Cyl / V6",
+      consumo: "28-34 MPG (~7.5 L/100km)",
+      base: 7.5,
+      min: 6.2,
+      max: 9.5,
+      queEs: "Sedan: Vehículo familiar estándar y confortable para autopistas interestatales (Interstate)"
     },
     SUV: {
-      ejemplos: "Honda CR-V, Toyota RAV4, Mazda CX-5, Kia Seltos",
-      motor: "2.0-2.5L",
-      consumo: "9.8-12.0",
-      base: 10.8,
-      min: 8.5,
-      max: 14.0,
-      queEs: "Grande / SUV / Camioneta: Camioneta familiar espaciosa, apta para baches y carretera"
+      ejemplos: "Ford Explorer, Jeep Grand Cherokee, Toyota RAV4, Chevy Tahoe",
+      motor: "2.5-3.5L V6 / 5.0L+ V8",
+      consumo: "20-26 MPG (~9.8 L/100km)",
+      base: 9.8,
+      min: 7.5,
+      max: 13.5,
+      queEs: "SUV / Crossover: Camioneta espaciosa con tracción AWD/4WD y gran capacidad para viajes largos"
     },
     cars: [
-      { id: 'mx-nissan-versa-16', brand: 'Nissan', model: 'Versa 1.6L', engine: '1.6L 4-Cilindros 118 HP', displacementL: '1.6', bodyType: 'sedan', defaultFuel: 'Gasolina', badge: 'Auto #1 en México' },
-      { id: 'mx-vw-jetta-14t', brand: 'Volkswagen', model: 'Jetta 1.4 TSI Turbo', engine: '1.4L TSI Turbo 150 HP', displacementL: '1.4', bodyType: 'sedan', defaultFuel: 'Gasolina', badge: 'Clásico Mexicano' },
-      { id: 'mx-nissan-march-16', brand: 'Nissan', model: 'March 1.6L', engine: '1.6L 4-Cilindros 106 HP', displacementL: '1.6', bodyType: 'compact', defaultFuel: 'Gasolina' },
-      { id: 'mx-toyota-rav4-hybrid', brand: 'Toyota', model: 'RAV4 2.5 Híbrida', engine: '2.5L Híbrido 219 HP Sin Verificación', displacementL: '2.5', bodyType: 'suv', defaultFuel: 'Gasolina', badge: 'Holo Exento' },
-      { id: 'mx-chevrolet-silverado-v8', brand: 'Chevrolet', model: 'Silverado 5.3 V8 (Gas LP)', engine: '5.3L V8 355 HP Bi-Fuel Gas LP', displacementL: '4.0', bodyType: 'pickup', defaultFuel: 'LPG', badge: 'V8 / Gas LP' },
-      { id: 'mx-nissan-np300-diesel', brand: 'Nissan', model: 'NP300 2.5L Diésel', engine: '2.5L Turbo Diésel 161 HP', displacementL: '2.5', bodyType: 'pickup', defaultFuel: 'Diésel', badge: 'Trabajo Rudo' }
+      { id: 'us-toyota-camry-25', brand: 'Toyota', model: 'Camry 2.5L', engine: '2.5L 4-Cyl 203 HP', displacementL: '2.5', bodyType: 'sedan', defaultFuel: 'Gasolina', badge: 'Top Seller USA' },
+      { id: 'us-ford-f150-v6', brand: 'Ford', model: 'F-150 3.5L EcoBoost', engine: '3.5L V6 Twin-Turbo 400 HP', displacementL: '3.5', bodyType: 'pickup', defaultFuel: 'Gasolina', badge: 'Best Selling Truck' },
+      { id: 'us-honda-crv-15', brand: 'Honda', model: 'CR-V 1.5L Turbo', engine: '1.5L 4-Cyl Turbo 190 HP', displacementL: '1.5', bodyType: 'suv', defaultFuel: 'Gasolina', badge: 'Family SUV' },
+      { id: 'us-jeep-cherokee-v6', brand: 'Jeep', model: 'Grand Cherokee 3.6L V6', engine: '3.6L Pentastar V6 293 HP', displacementL: '3.6', bodyType: 'suv', defaultFuel: 'Gasolina' },
+      { id: 'us-chevy-silverado-v8', brand: 'Chevrolet', model: 'Silverado 1500 5.3L V8', engine: '5.3L EcoTec3 V8 355 HP', displacementL: '5.3', bodyType: 'pickup', defaultFuel: 'Gasolina' },
+      { id: 'us-ram-diesel', brand: 'RAM', model: 'RAM 2500 Heavy Duty Diesel', engine: '6.7L Cummins Turbo Diesel 370 HP', displacementL: '6.7', bodyType: 'pickup', defaultFuel: 'Diésel', badge: 'Heavy Duty' }
     ],
     tramitesLegales: [
       {
-        id: 'mx_verificacion_sedema',
-        title: 'Verificación Vehicular Ambiental (Holograma)',
-        tramiteType: 'Verificación',
-        entity: 'Verificentro Autorizado (SEDEMA)',
-        frequency: 'Semestral (Cada 6 meses)',
-        defaultCost: 708.00,
-        description: 'Prueba de emisiones contaminantes para circular en CDMX, Edomex y zona megalopolitana (Hoy No Circula).'
-      },
-      {
-        id: 'mx_seguro_qualitas',
-        title: 'Póliza de Seguro de Auto (Cobertura Amplia)',
-        tramiteType: 'Seguro',
-        entity: 'Quálitas Compañía de Seguros / GNP',
+        id: 'us_dmv_registration',
+        title: 'DMV Annual Vehicle Registration',
+        tramiteType: 'Registration',
+        entity: 'Department of Motor Vehicles (DMV)',
         frequency: 'Anual (12 meses)',
-        defaultCost: 8200.00,
-        description: 'Seguro con responsabilidad civil obligatoria en carreteras federales y cobertura contra robo total.'
+        defaultCost: 150.00,
+        description: 'Renovación anual del registro estatal y sticker de la matrícula (license plate tags).'
       },
       {
-        id: 'mx_tenencia_refrendo',
-        title: 'Pago de Tenencia y Refrendo de Placas',
-        tramiteType: 'Impuestos',
-        entity: 'Secretaría de Finanzas Estatal',
-        frequency: 'Anual (Primer trimestre)',
-        defaultCost: 688.00,
-        description: 'Derecho anual por uso de placas y control vehicular ante el gobierno estatal.'
+        id: 'us_smog_inspection',
+        title: 'State Safety & Smog Check Inspection',
+        tramiteType: 'Inspection',
+        entity: 'State Certified Inspection Station',
+        frequency: 'Cada 1 a 2 años según el estado',
+        defaultCost: 55.00,
+        description: 'Inspección técnica estatal obligatoria de seguridad mecánica y control de emisiones contaminantes.'
       },
       {
-        id: 'mx_dictamen_gas_lp',
-        title: 'Dictamen de Seguridad Tanque Gas LP',
-        tramiteType: 'Dictamen Gas',
-        entity: 'Unidad de Verificación Autorizada',
-        frequency: 'Anual',
-        defaultCost: 950.00,
-        description: 'Certificado de hermeticidad y vida útil del tanque de carburación Gas LP.'
+        id: 'us_auto_insurance',
+        title: 'Auto Insurance (Full Coverage / Liability)',
+        tramiteType: 'Insurance',
+        entity: 'Geico / Progressive / State Farm',
+        frequency: 'Semestral / Anual',
+        defaultCost: 720.00,
+        description: 'Póliza de seguro automotor reglamentaria obligatoria de responsabilidad civil con cobertura integral.'
+      },
+      {
+        id: 'us_toll_pass',
+        title: 'Electronic Toll Pass (E-ZPass / SunPass)',
+        tramiteType: 'Peajes',
+        entity: 'State Highway Toll Authority',
+        frequency: 'Prepago recargable',
+        defaultCost: 35.00,
+        description: 'Transpondedor electrónico para pago automático de peajes en autopistas, puentes y túneles.'
       }
     ],
     mantenimientosTipicos: [
       {
-        id: 'mx_maint_afinacion',
-        serviceType: 'Afinación Mayor & Aceite',
-        productBrand: 'Castrol GTX 20W50 / Quaker State + Filtros Gonher',
-        workshop: 'Taller Autorizado Insurgentes CDMX',
-        intervalKm: 10000,
-        defaultCost: 1650.00,
-        notes: 'Cambio de bujías de platino, lavado de cuerpo de aceleración y aceite.'
+        id: 'us_maint_oil',
+        serviceType: 'Full Synthetic Oil Change & Filter',
+        productBrand: 'Mobil 1 Full Synthetic 0W-20 / Pennzoil Platinum',
+        workshop: 'Jiffy Lube / Valvoline Instant Oil Change',
+        intervalKm: 12000,
+        defaultCost: 85.00,
+        notes: 'Cambio de aceite 100% sintético y filtro OEM para clima variado y viajes interestatales.'
       },
       {
-        id: 'mx_maint_gas_lp',
-        serviceType: 'Servicio Vaporizador & Filtro Gas LP',
-        productBrand: 'Kit Reparación Impco / Lovato Gas LP',
-        workshop: 'Carburación Gas LP Naucalpan',
-        intervalKm: 20000,
-        defaultCost: 850.00,
-        notes: 'Drenado de impurezas y sustitución de diafragma vaporizador.'
+        id: 'us_maint_brakes',
+        serviceType: 'Front Brake Pads & Rotors Service',
+        productBrand: 'Wagner OEx Ceramic / Bosch QuietCast',
+        workshop: 'Firestone Complete Auto Care',
+        intervalKm: 40000,
+        defaultCost: 260.00,
+        notes: 'Pastillas cerámicas y rectificado o reemplazo de rotores para frenado seguro en autopista.'
       },
       {
-        id: 'mx_maint_frenos',
-        serviceType: 'Balatas y Rectificado de Discos',
-        productBrand: 'Balatas Fritec Cerámicas / Duralast',
-        workshop: 'Midas México / AutoZone',
-        intervalKm: 30000,
-        defaultCost: 1400.00,
-        notes: 'Rectificado de discos y balatas nuevas para frenado en pendientes y topes.'
+        id: 'us_maint_rotation',
+        serviceType: 'Tire Rotation & Balance + Alignment',
+        productBrand: 'Hunter Road Force Balance',
+        workshop: 'Discount Tire / Goodyear Auto Service',
+        intervalKm: 15000,
+        defaultCost: 75.00,
+        notes: 'Rotación periódica para desgaste parejo de neumáticos en recorridos de alta velocidad.'
       }
     ],
     neumaticosInfo: {
-      tipoPredeterminado: 'Toda Temporada (All-Season)',
-      marcasPopulares: ['Bridgestone Ecopia EP422', 'Michelin Defender', 'Continental PowerContact', 'Tornel'],
-      presionDelanteraPsi: 33,
-      presionTraseraPsi: 33,
-      almacenajeOTaller: 'Llantera Servifácil CDMX'
+      tipoPredeterminado: 'All-Season / Highway Terrain',
+      marcasPopulares: ['Goodyear Assurance', 'Michelin Defender 2', 'Bridgestone Dueler', 'Continental TrueContact'],
+      presionDelanteraPsi: 34,
+      presionTraseraPsi: 34,
+      almacenajeOTaller: 'Discount Tire / Firestone Auto Care'
     }
   },
 
-  // =========================================================================
-  // 4. ESPAÑA 🇪🇸
-  // =========================================================================
-  ES: {
-    codigo: 'ES',
-    nombre: 'España',
-    bandera: '🇪🇸',
-    moneda: 'EUR',
-    unidadPrecio: '€/L',
-    unidadConsumo: 'L/100km',
-    gasolineras: ['Repsol', 'Cepsa', 'BP España', 'Galp', 'Shell España', 'Ballenoil', 'Plenoil', 'Petronor'],
-    preciosDefecto: { gasolina: 1.58, diesel: 1.45, lpg: 0.95 },
-    etiquetasCombustible: { gasolina: 'Gasolina 95', diesel: 'Diésel / Gasóleo A', lpg: 'Autogás LPG' },
-    ciudadesRutasEjemplo: ['Madrid a Valencia (A-3)', 'Barcelona a Zaragoza (AP-2)', 'Sevilla a Málaga (A-92)'],
-    Compacto: {
-      ejemplos: "Seat Ibiza, Renault Clio, Peugeot 208",
-      motor: "1.0-1.2L",
-      consumo: "5.2-6.5",
-      base: 5.8,
-      min: 4.5,
-      max: 7.2,
-      queEs: "Compacto / Utilitario: Coche maniobrable para ciudad y rondas con distintivo ambiental ECO"
-    },
-    Sedan: {
-      ejemplos: "Seat León, Peugeot 308, Golf, Corolla",
-      motor: "1.5-2.0L",
-      consumo: "6.8-8.2",
-      base: 7.5,
-      min: 6.0,
-      max: 9.5,
-      queEs: "Sedán / Berlina: Coche equilibrado para autovías y trayectos largos con bajo consumo"
-    },
-    SUV: {
-      ejemplos: "Seat Ateca, Cupra Formentor, Hyundai Tucson, Qashqai",
-      motor: "1.6-2.0L",
-      consumo: "8.5-10.2",
-      base: 9.2,
-      min: 7.5,
-      max: 12.5,
-      queEs: "Grande / SUV / Crossover: Vehículo elevado, mayor visibilidad y habitabilidad para familia"
-    },
-    cars: [
-      { id: 'es-seat-ibiza-tsi', brand: 'Seat', model: 'Ibiza 1.0 TSI', engine: '1.0L TSI 110 CV Gasolina', displacementL: '1.0', bodyType: 'compact', defaultFuel: 'Gasolina', badge: 'Top España' },
-      { id: 'es-dacia-sandero-glp', brand: 'Dacia', model: 'Sandero 1.0 ECO-G (LPG)', engine: '1.0L ECO-G 100 CV Etiqueta ECO LPG', displacementL: '1.0', bodyType: 'compact', defaultFuel: 'LPG', badge: 'N°1 Ventas LPG' },
-      { id: 'es-toyota-corolla-hybrid', brand: 'Toyota', model: 'Corolla 1.8 Hybrid', engine: '1.8L Híbrido 140 CV Etiqueta ECO', displacementL: '1.8', bodyType: 'compact', defaultFuel: 'Gasolina', badge: 'Etiqueta ECO' },
-      { id: 'es-cupra-formentor-tsi', brand: 'Cupra', model: 'Formentor 1.5 TSI', engine: '1.5L TSI 150 CV', displacementL: '1.5', bodyType: 'suv', defaultFuel: 'Gasolina' },
-      { id: 'es-renault-clio-glp', brand: 'Renault', model: 'Clio 1.0 TCe LPG', engine: '1.0L Turbo LPG 100 CV', displacementL: '1.0', bodyType: 'compact', defaultFuel: 'LPG' },
-      { id: 'es-hyundai-tucson-crdi', brand: 'Hyundai', model: 'Tucson 1.6 CRDi 48V', engine: '1.6L Diésel Mild-Hybrid 136 CV', displacementL: '1.6', bodyType: 'suv', defaultFuel: 'Diésel' }
-    ],
-    tramitesLegales: [
-      {
-        id: 'es_itv_applus',
-        title: 'Inspección Técnica de Vehículos (ITV)',
-        tramiteType: 'ITV',
-        entity: 'Estación ITV Oficial (Applus+ / TÜV)',
-        frequency: 'Cada 2 años (Anual tras 10 años)',
-        defaultCost: 48.00,
-        description: 'Revisión periódica oficial de seguridad y emisiones. Incluye distintivo adhesivo para el parabrisas.'
-      },
-      {
-        id: 'es_seguro_mapfre',
-        title: 'Seguro del Automóvil (Terceros Ampliado)',
-        tramiteType: 'Seguro',
-        entity: 'Mapfre España / Mutua Madrileña',
-        frequency: 'Anual (12 meses)',
-        defaultCost: 320.00,
-        description: 'Póliza anual con responsabilidad civil obligatoria, lunas, incendio y asistencia en carretera.'
-      },
-      {
-        id: 'es_ivtm_rodaje',
-        title: 'Impuesto de Tracción Mecánica (IVTM / Rodaje)',
-        tramiteType: 'Impuestos',
-        entity: 'Ayuntamiento Municipal',
-        frequency: 'Anual',
-        defaultCost: 68.00,
-        description: 'Tasa municipal anual obligatoria según los caballos fiscales (CVF) del motor.'
-      },
-      {
-        id: 'es_revision_glp',
-        title: 'Inspección y Estanqueidad Autogás LPG',
-        tramiteType: 'Revisión LPG',
-        entity: 'Taller Homologado Instalador LPG',
-        frequency: 'Anual / Cada 20.000 km',
-        defaultCost: 75.00,
-        description: 'Certificado de revisión de válvulas, electroválvula de corte y estanqueidad del circuito de gas.'
-      }
-    ],
-    mantenimientosTipicos: [
-      {
-        id: 'es_maint_aceite',
-        serviceType: 'Cambio de Aceite & Filtros',
-        productBrand: 'Repsol Elite 5W30 Long Life + Filtro Bosch',
-        workshop: 'Midas Madrid / Norauto',
-        intervalKm: 15000,
-        defaultCost: 140.00,
-        notes: 'Aceite sintético Low SAPS compatible con filtro antipartículas DPF/FAP.'
-      },
-      {
-        id: 'es_maint_frenos',
-        serviceType: 'Pastillas de Freno Delanteras',
-        productBrand: 'Brembo P 85 020 / Ferodo',
-        workshop: 'Feu Vert Barcelona',
-        intervalKm: 35000,
-        defaultCost: 110.00,
-        notes: 'Sustitución de pastillas delanteras y comprobación de líquido DOT4.'
-      },
-      {
-        id: 'es_maint_autogas',
-        serviceType: 'Filtro Fase Gaseosa LPG',
-        productBrand: 'Filtro Gas Landi Renzo / BRC',
-        workshop: 'Taller Gas AutoGas Alcalá',
-        intervalKm: 20000,
-        defaultCost: 65.00,
-        notes: 'Sustitución de cartucho filtrante para protección de los inyectores de gas.'
-      }
-    ],
-    neumaticosInfo: {
-      tipoPredeterminado: '4 Estaciones (All Season) / Verano',
-      marcasPopulares: ['Michelin CrossClimate 2', 'Continental AllSeasonContact', 'Pirelli Cinturato', 'Bridgestone Turanza'],
-      presionDelanteraPsi: 33,
-      presionTraseraPsi: 32,
-      almacenajeOTaller: 'Euromaster Madrid'
-    }
-  }
 };
 
 export function detectDefaultCountry(): CountryCode {
@@ -587,8 +463,7 @@ export function detectDefaultCountry(): CountryCode {
     }
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
     if (tz.includes('Bogota') || tz.includes('Colombia')) return 'CO';
-    if (tz.includes('Mexico') || tz.includes('Cancun') || tz.includes('Tijuana') || tz.includes('Monterrey')) return 'MX';
-    if (tz.includes('Madrid') || tz.includes('Canary')) return 'ES';
+    if (tz.includes('New_York') || tz.includes('Chicago') || tz.includes('Los_Angeles') || tz.includes('Denver') || tz.includes('Phoenix') || tz.includes('America') || tz.includes('US')) return 'US';
     if (tz.includes('Warsaw') || tz.includes('Poland')) return 'PL';
   } catch (e) {}
   return 'PL';

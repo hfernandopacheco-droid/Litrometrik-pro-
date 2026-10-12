@@ -226,7 +226,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
         {/* Country Selector */}
         <div className="flex items-center space-x-1 bg-[#111827] border border-slate-800 rounded-2xl p-1 shadow-sm">
           <Globe className="w-3.5 h-3.5 text-slate-400 ml-1.5 mr-0.5" />
-          {(['PL', 'CO', 'ES', 'MX'] as CountryCode[]).map((c) => (
+          {(['PL', 'CO', 'US'] as CountryCode[]).map((c) => (
             <button
               key={c}
               type="button"

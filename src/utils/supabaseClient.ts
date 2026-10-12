@@ -703,6 +703,65 @@ export const deleteSupabaseVehicle = async (vehicleId: string) => {
   if (error) console.warn('deleteSupabaseVehicle error:', error.message);
 };
 
+export const upsertCustomVehicleSupabase = async (
+  userId: string,
+  vehicle: {
+    nombre: string;
+    categoria: string;
+    combustible: string;
+    consumoBaseL100: number;
+    cilindrada: string;
+    transmision?: string;
+  }
+) => {
+  const c = (vehicle.combustible || '').toLowerCase();
+  const tipoCombustible = (c.includes('glp') || c.includes('lpg') || c.includes('gas') || c.includes('propane') || c.includes('autogaz'))
+    ? 'glp'
+    : (c.includes('diesel') || c.includes('diésel') || c.includes('acpm') || c.includes('on'))
+    ? 'diesel'
+    : 'gasolina';
+
+  const payload: any = {
+    alias: vehicle.nombre,
+    marca: vehicle.nombre.split(' ')[0] || 'Personalizado',
+    modelo: `${vehicle.nombre} (${vehicle.cilindrada || 'Custom'})`,
+    tipo_vehiculo: vehicle.categoria || 'custom',
+    transmision: vehicle.transmision || 'manual',
+    tipo_combustible: tipoCombustible,
+    consumo_base: vehicle.consumoBaseL100,
+    activo: true,
+    updated_at: new Date().toISOString(),
+  };
+
+  let effectiveUserId = (userId && userId !== 'guest' && userId !== 'guest_user') ? userId : null;
+  if (!effectiveUserId) {
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user?.id) effectiveUserId = data.user.id;
+    } catch (_) {}
+  }
+
+  if (effectiveUserId) {
+    payload.user_id = effectiveUserId;
+    try {
+      const { data, error } = await supabase
+        .from('vehicles')
+        .insert([payload])
+        .select();
+
+      if (error) {
+        console.warn('Supabase upsertCustomVehicle error:', error.message);
+      } else {
+        console.log('Vehículo personalizado sincronizado con Supabase:', data);
+        return data?.[0] || null;
+      }
+    } catch (err: any) {
+      console.warn('Supabase upsertCustomVehicle exception:', err?.message);
+    }
+  }
+  return null;
+};
+
 // ----------------- GARAGE RECORDS HELPERS -----------------
 
 export const getSupabaseGarageRecords = async (userId: string, categoria?: string) => {

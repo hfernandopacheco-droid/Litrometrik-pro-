@@ -435,9 +435,8 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
                     }}
                   >
                     <option value="PL">🇵🇱 Polonia (PLN - Złoty)</option>
-                    <option value="ES">🇪🇸 España (EUR - Euro)</option>
                     <option value="CO">🇨🇴 Colombia (COP - Peso)</option>
-                    <option value="MX">🇲🇽 México (MXN - Peso)</option>
+                    <option value="US">🇺🇸 Estados Unidos (USD - Dollar)</option>
                   </select>
                 </div>
 
@@ -555,7 +554,7 @@ export const UserWazerProfileModal: React.FC<UserWazerProfileModalProps> = ({
                       border: '1px solid rgba(255, 255, 255, 0.15)',
                     }}
                   >
-                    <option value="LPG">{country === 'CO' || country === 'MX' ? '🟢 Gas GLP' : '🟢 Gas LPG'}</option>
+                    <option value="LPG">{country === 'CO' ? '🟢 Gas GLP' : '🟢 Gas LPG'}</option>
                     <option value="Gasolina">🔵 Gasolina 95 / Pb95</option>
                     <option value="Gasolina 98">⚡ Gasolina 98 Premium</option>
                     <option value="Diésel">🟡 Diésel / ACPM</option>

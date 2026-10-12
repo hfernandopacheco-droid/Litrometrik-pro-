@@ -491,9 +491,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     className="w-full bg-[#0f172a] border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="PL">🇵🇱 Polonia (PLN - Złoty)</option>
-                    <option value="ES">🇪🇸 España (EUR - Euro)</option>
                     <option value="CO">🇨🇴 Colombia (COP - Peso)</option>
-                    <option value="MX">🇲🇽 México (MXN - Peso)</option>
+                    <option value="US">🇺🇸 Estados Unidos (USD - Dollar)</option>
                   </select>
                 </div>
 
