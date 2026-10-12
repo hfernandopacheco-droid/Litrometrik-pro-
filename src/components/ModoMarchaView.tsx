@@ -2144,7 +2144,15 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   DISTANCIA
                 </span>
                 <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-white tracking-tight mt-1">
-                  {distanceKm.toFixed(2).replace('.', ',')} <span className="text-xs sm:text-sm font-bold text-slate-400">km</span>
+                  {distanceKm < 1.0 ? (
+                    <>
+                      {Math.round(distanceKm * 1000)} <span className="text-xs sm:text-sm font-bold text-slate-400">m</span>
+                    </>
+                  ) : (
+                    <>
+                      {distanceKm.toFixed(2).replace('.', ',')} <span className="text-xs sm:text-sm font-bold text-slate-400">km</span>
+                    </>
+                  )}
                 </div>
               </div>
               <p className="text-[11px] text-slate-400 font-medium">
@@ -3516,7 +3524,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 </div>
                 <h3 className="text-base font-black text-white">Distancia Recorrida y Movimiento</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Registra los kilómetros reales medidos vía satélite GPS desde que iniciaste la marcha. El subtexto 'L mov.' muestra los litros consumidos únicamente mientras las ruedas estuvieron girando.
+                  Registra la distancia real medida vía satélite GPS desde que iniciaste la marcha (mostrada en metros 'm' si es menor a 1 km o en 'km' con 2 decimales si es igual o superior). El subtexto 'L mov.' muestra los litros consumidos únicamente mientras las ruedas estuvieron girando.
                 </p>
                 <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-xs leading-relaxed space-y-1">
                   <span className="font-black text-sky-400 block text-[11px] uppercase tracking-wider">Ejemplo cotidiano:</span>
