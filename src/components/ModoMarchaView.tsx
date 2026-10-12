@@ -932,7 +932,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     setElapsedSeconds((prev) => prev + deltaSec);
 
     const speed = currentSpeedRef.current;
-    const isIdle = speed < 3;
+    const isIdle = speed < 2.5;
     const isLpg = activeFuelRef.current === 'Gas LPG';
     const isDiesel = activeFuelRef.current === 'Diésel ON';
     const isAC = isACActiveRef.current;
@@ -958,27 +958,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         return nextL;
       });
     } else {
-      // EN MOVIMIENTO
+      // EN MOVIMIENTO REAL (La distancia y litros de movimiento son 100% calculados por el satélite GPS nativo)
       setMovingSeconds((prev) => prev + deltaSec);
-
-      // Sincronización continua de avance: si el GPS satelital no ha enviado delta en los últimos 1.5s
-      const now = Date.now();
-      if (now - lastGpsPositionUpdateTimeRef.current > 1500) {
-        const deltaKm = (speed * deltaSec) / 3600;
-        const transMult = transmissionRef.current === 'automatic' ? 1.08 : 1.0;
-        const fuelMult = isLpg ? 1.20 : isDiesel ? 0.85 : 1.0;
-        const acAdd = isAC ? 0.60 : 0.0;
-        const currentRateL100 = (baseConsumptionL100Ref.current * transMult * fuelMult) + acAdd;
-        const movingBurnedLiters = (deltaKm * currentRateL100) / 100;
-
-        setDistanceKm((prevKm) => prevKm + deltaKm);
-        setLiveMovingLiters((prevMov) => prevMov + movingBurnedLiters);
-        setLiveLiters((prevL) => {
-          const nextL = prevL + movingBurnedLiters;
-          setLiveCost(nextL * fuelPriceRef.current);
-          return nextL;
-        });
-      }
     }
   };
 
@@ -1109,12 +1090,36 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       if (navigator.geolocation) {
         watchIdRef.current = navigator.geolocation.watchPosition(
           (pos) => {
-            const speedKmh = pos.coords.speed
-              ? Math.max(0, Math.round(pos.coords.speed * 3.6))
-              : 0;
-            setCurrentSpeed(speedKmh);
-
+            setGpsError(null);
             const now = Date.now();
+            const rawSpeed = pos.coords.speed;
+            const accuracy = pos.coords.accuracy;
+            const isAccurate = typeof accuracy !== 'number' || accuracy < 30;
+
+            let deltaKm = 0;
+            let deltaSec = 0;
+
+            if (lastLocationRef.current) {
+              deltaSec = Math.max(0.1, (now - lastLocationRef.current.time) / 1000);
+              deltaKm = calculateDistanceKm(
+                lastLocationRef.current.lat,
+                lastLocationRef.current.lng,
+                pos.coords.latitude,
+                pos.coords.longitude
+              );
+            }
+
+            // Velocidad real: coords.speed directo (m/s * 3.6) o derivación Haversine / deltaSec
+            let calculatedSpeedKmh = 0;
+            if (typeof rawSpeed === 'number' && rawSpeed >= 0) {
+              calculatedSpeedKmh = rawSpeed * 3.6;
+            } else if (deltaKm > 0 && deltaSec > 0 && isAccurate) {
+              calculatedSpeedKmh = deltaKm / (deltaSec / 3600);
+            }
+
+            // Filtro de ruido: si es menor a 2.5 km/h, trátala como 0 km/h (vehículo en reposo/ralentí)
+            const speedKmh = calculatedSpeedKmh < 2.5 ? 0 : Math.round(calculatedSpeedKmh);
+            setCurrentSpeed(speedKmh);
 
             if (speedKmh > speedLimit && now - lastSpeedAlertRef.current > 15000) {
               lastSpeedAlertRef.current = now;
@@ -1128,21 +1133,15 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             prevSpeedRef.current = speedKmh;
 
             let updatedKm = distanceKm;
-            if (lastLocationRef.current) {
-              const delta = calculateDistanceKm(
-                lastLocationRef.current.lat,
-                lastLocationRef.current.lng,
-                pos.coords.latitude,
-                pos.coords.longitude
-              );
-
-              if (delta > 0.003 && delta < 2.0) {
+            // Distancia real: acumula únicamente con Haversine si precisión < 30m y velocidad >= 2.5 km/h
+            if (lastLocationRef.current && isAccurate && speedKmh >= 2.5) {
+              if (deltaKm > 0.003 && deltaKm < 3.0) {
                 lastGpsPositionUpdateTimeRef.current = now;
                 setDistanceKm((prevKm) => {
-                  const nextKm = prevKm + delta;
+                  const nextKm = prevKm + deltaKm;
                   updatedKm = nextKm;
 
-                  // Dynamic consumption factor based on selected vehicle, engine, transmission, fuel and A/C
+                  // Factor dinámico de consumo según vehículo, transmisión, combustible y A/C
                   const transMult = transmissionRef.current === 'automatic' ? 1.08 : 1.0;
                   const fuelMult =
                     activeFuelRef.current === 'Gas LPG' ? 1.20 :
@@ -1150,7 +1149,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   const acAdd = isACActiveRef.current ? 0.60 : 0.0;
                   const currentRateL100 = (baseConsumptionL100Ref.current * transMult * fuelMult) + acAdd;
 
-                  const movingBurnedLiters = (delta * currentRateL100) / 100;
+                  const movingBurnedLiters = (deltaKm * currentRateL100) / 100;
 
                   setLiveMovingLiters((prevMov) => prevMov + movingBurnedLiters);
 
@@ -1185,9 +1184,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
           },
           (err) => {
             console.warn('GPS location error:', err);
-            setGpsError('⚠️ Permiso de ubicación requerido para calcular distancia.');
+            setGpsError('⚠️ Permiso de ubicación requerido para calcular distancia satelital.');
           },
-          { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
       } else {
         setGpsError('⚠️ Este dispositivo no soporta el sensor GPS.');
@@ -1826,6 +1825,14 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const currentCountry = countries.find((c) => c.code === selectedCountry) || countries[0];
   const activeVehiclePreset = VEHICLE_PRESETS.find((v) => v.type === vehicleType) || VEHICLE_PRESETS[1];
   const activeVehicleState = getActiveVehicleState();
+  const currentActiveEngine = useMemo(() => {
+    const cat = UNIFIED_VEHICLE_CATALOG[vehicleType] || UNIFIED_VEHICLE_CATALOG.sedan;
+    if (!cat) return null;
+    return (
+      cat.engines.find((e: UnifiedEngineSpec) => e.nombreComun === engineName || e.name === engineName) ||
+      cat.engines[0]
+    );
+  }, [vehicleType, engineName]);
 
   return (
     <div className="min-h-screen bg-[#080B11] text-white pb-28 sm:pb-32 select-none font-sans antialiased">
@@ -2014,7 +2021,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               setModalTempEngineName(engineName);
               setModalTempBaseL100(baseConsumptionL100);
               setModalTempTransmission(transmission);
-              setModalTempVehicleModelName(activeVehicleState.vehicleModelName || activeVehiclePreset.label);
+              setModalTempVehicleModelName(activeVehiclePreset.label);
               setShowVehicleModal(true);
             }}
             className="flex-1 flex items-center justify-between p-1 rounded-xl hover:bg-white/5 transition active:scale-[0.99] cursor-pointer text-left group"
@@ -2032,23 +2039,34 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 )}
               </div>
               <div className="min-w-0">
-                <div className="flex items-center space-x-1.5 leading-tight flex-wrap gap-y-1">
+                <div className="flex items-center space-x-2 leading-tight">
+                  {/* Categoría a la izquierda */}
                   <span className="text-xs font-black text-white truncate">
-                    {activeVehicleState.vehicleModelName || activeVehiclePreset.label}
+                    {activeVehiclePreset.label}
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-400 font-bold border border-sky-500/30 shrink-0">
-                    {engineName}
-                  </span>
-                  {isACActive && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-cyan-500/25 text-cyan-300 font-black border border-cyan-400/50 shrink-0 flex items-center space-x-1">
-                      <Snowflake className="w-2.5 h-2.5 text-cyan-300 animate-spin" />
-                      <span>A/C (+0.6)</span>
-                    </span>
-                  )}
+                  {/* Pastilla a la derecha: "Motor 1.6L Estándar (?)" */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (currentActiveEngine) {
+                        setSelectedEngineForInfo(currentActiveEngine);
+                      } else {
+                        setModalTempVehicleType(vehicleType);
+                        setModalTempEngineName(engineName);
+                        setShowVehicleModal(true);
+                      }
+                    }}
+                    className="text-[10px] px-2 py-0.5 rounded-md bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 font-bold border border-sky-500/30 flex items-center space-x-1 transition active:scale-95 cursor-pointer shrink-0"
+                    title="Ver ficha técnica del motor"
+                  >
+                    <span className="truncate max-w-[130px] sm:max-w-none">{engineName}</span>
+                    <span className="w-3.5 h-3.5 rounded-full bg-sky-500/20 text-sky-300 font-black flex items-center justify-center text-[9px] ml-0.5">?</span>
+                  </button>
                 </div>
+                {/* Debajo solo: consumo base y transmisión */}
                 <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
-                  {formatFuelEconomy(baseConsumptionL100, selectedCountry)} base • {transmission === 'automatic' ? 'Automático' : 'Manual'}
-                  {isACActive ? ' • A/C Encendido' : ' • Modo Eco'}
+                  {formatFuelEconomy(baseConsumptionL100, selectedCountry)} base · {transmission === 'automatic' ? 'Automático' : 'Manual'}
                 </p>
               </div>
             </div>
@@ -2416,32 +2434,6 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             </button>
           </div>
         </div>
-
-        {/* Simulador / Test de Velocidad GPS (Disponible cuando el cronómetro está en marcha) */}
-        {isRunning && (
-          <div className="flex items-center justify-between px-3 py-1.5 rounded-2xl bg-[#0F1420]/80 border border-slate-800/80 text-[10px] text-slate-400">
-            <span className="font-bold flex items-center space-x-1 text-slate-400">
-              <Navigation className="w-3 h-3 text-[#00D4FF]" />
-              <span>Simular GPS:</span>
-            </span>
-            <div className="flex items-center space-x-1.5">
-              {[0, 45, 80, 120].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setCurrentSpeed(s)}
-                  className={`px-2 py-0.5 rounded-lg border font-mono font-bold transition cursor-pointer active:scale-95 ${
-                    currentSpeed === s
-                      ? 'bg-[#00D4FF]/20 border-[#00D4FF] text-[#00D4FF]'
-                      : 'bg-slate-800/90 border-slate-700/80 text-slate-300 hover:text-white'
-                  }`}
-                >
-                  {s} km/h
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ---------------- 2 & 5. SALDO RESTANTE EN TANQUE CON DESCUENTO EN VIVO Y ALERTA DE RESERVA ---------------- */}
         <div
@@ -3457,8 +3449,14 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 </div>
                 <h3 className="text-base font-black text-white">Distancia Recorrida y Movimiento</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Mide la distancia exacta calculada por satélite GPS desde que iniciaste el trayecto. En la parte inferior registra cuántos litros de combustible gastó el motor exclusivamente mientras el auto estuvo rodando, descontando los momentos en que te detuviste en semáforos o atascos.
+                  Registra los kilómetros reales medidos vía satélite GPS desde que iniciaste la marcha. El subtexto 'L mov.' muestra los litros consumidos únicamente mientras las ruedas estuvieron girando.
                 </p>
+                <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-xs leading-relaxed space-y-1">
+                  <span className="font-black text-sky-400 block text-[11px] uppercase tracking-wider">Ejemplo cotidiano:</span>
+                  <p className="text-slate-200">
+                    Si manejas 10 km de tu casa al trabajo y te detienes en 3 semáforos, aquí verás exactamente esos 10 km recorridos y cuánta gasolina se quemó exclusivamente mientras el auto rodaba.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -3469,8 +3467,14 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 </div>
                 <h3 className="text-base font-black text-white">Litros Totales Consumidos</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Es el acumulador de combustible quemado durante todo el viaje. Suma el combustible consumido al acelerar más el combustible consumido en ralentí (cuando el motor está encendido pero el vehículo permanece detenido). Conforme este número sube, se descuenta de forma idéntica de la gota de litros de tu tanque.
+                  Es el acumulador total de combustible quemado en el viaje. Suma el combustible usado al rodar más el combustible quemado en ralentí cuando estás detenido con el motor encendido.
                 </p>
+                <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-xs leading-relaxed space-y-1">
+                  <span className="font-black text-emerald-400 block text-[11px] uppercase tracking-wider">Ejemplo cotidiano:</span>
+                  <p className="text-slate-200">
+                    Es como una botella de medición. Si marca 0,5 L, significa que de tu tanque ya salieron físicamente exactamente medio litro de combustible desde que pulsaste Iniciar.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -3481,8 +3485,14 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 </div>
                 <h3 className="text-base font-black text-white">Gasto Económico en Vivo</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Convierte los litros consumidos a dinero real según el precio por litro configurado en tu último tanqueo. Refleja exactamente cuánto te está costando el viaje actual en tu moneda y se resta en vivo del saldo monetario de tu tanque.
+                  Multiplica los litros totales consumidos por el precio de compra del combustible activo (LPG, Gasolina o Diésel). Se resta en tiempo real del saldo monetario de tu tanque.
                 </p>
+                <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-xs leading-relaxed space-y-1">
+                  <span className="font-black text-[#FF5722] block text-[11px] uppercase tracking-wider">Ejemplo cotidiano:</span>
+                  <p className="text-slate-200">
+                    Si tu litro de gas cuesta 3,80 PLN (o tu moneda local) y has quemado 0,5 litros, este contador te marca exactamente 1,90 gastados en este trayecto.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -3491,10 +3501,20 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 <div className="w-11 h-11 rounded-2xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
                   <Snowflake className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-black text-white">Ritmo de Consumo Instantáneo y A/C</h3>
+                <h3 className="text-base font-black text-white">Ritmo de Consumo (L/100km o L/h)</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Muestra la eficiencia del motor en cada segundo según tu velocidad y aceleración. Si estás en Europa se expresa en L/100km; si estás en Colombia/México se expresa en km/L. El interruptor de Aire A/C simula la carga mecánica del compresor en el motor (aproximadamente +0.6 L/100km en marcha o +0.5 L/h detenido).
+                  Muestra la eficiencia del motor en cada segundo. En movimiento indica tu ritmo por distancia (L/100km o km/L según el país). Cuando el vehículo está completamente detenido en 0 km/h, la unidad cambia automáticamente a L/h (litros por hora en ralentí).
                 </p>
+                <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-xs leading-relaxed space-y-1">
+                  <span className="font-black text-cyan-400 block text-[11px] uppercase tracking-wider">Ejemplo cotidiano:</span>
+                  <p className="text-slate-200">
+                    Si el carro está detenido en un semáforo y marca 1,0 L/h, NO significa que ya gastaste un litro; significa que si dejas el auto encendido parado en ese semáforo durante 1 hora completa, quemará 1 litro. Si avanzas a 50 km/h marcará tu ritmo de marcha (ej. 8,6 L/100km).
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-[11px] text-cyan-200 leading-relaxed">
+                  <span className="font-black text-cyan-300 block mb-0.5">Aire Acondicionado (A/C):</span>
+                  El switch de A/C suma la carga real del compresor mecánico (+0.6 L/100km rodando o +0.5 L/h detenido). Si está apagado, muestra el gasto natural del motor sin recargo.
+                </div>
               </div>
             )}
 
@@ -3503,10 +3523,16 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                 <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 text-lg">
                   💧
                 </div>
-                <h3 className="text-base font-black text-white">Reserva de Tanque y Combustible Activo</h3>
+                <h3 className="text-base font-black text-white">Reserva del Tanque Activo</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Muestra los litros físicos y el saldo en dinero que le quedan al combustible que tienes seleccionado (LPG, Gasolina o Diésel). Cuando estás conduciendo con LPG seleccionado, el gasto se descuenta únicamente del tanque de gas. Si cambias a Gasolina, los cálculos pasan a descontarse del tanque de gasolina.
+                  Muestra el volumen en litros y el valor monetario restante del combustible seleccionado. Conforme 'Consumo en Vivo' y 'Gasto en Vivo' aumentan, se descuentan de forma sincronizada de este tanque.
                 </p>
+                <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-xs leading-relaxed space-y-1">
+                  <span className="font-black text-amber-400 block text-[11px] uppercase tracking-wider">Ejemplo cotidiano:</span>
+                  <p className="text-slate-200">
+                    Si tenías 25,00 L en tu tanque de LPG y en este viaje quemaste 0,75 L, tu indicador bajará automáticamente a 24,25 L restantes.
+                  </p>
+                </div>
               </div>
             )}
 
