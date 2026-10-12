@@ -23,10 +23,11 @@ import {
   Trash2,
   Camera,
   Upload,
+  Pencil,
 } from 'lucide-react';
 import { CountryCode, DATA_PAIS } from '../utils/countryData';
 import { fetchCloudRecords } from '../utils/firestoreService';
-import { getSupabaseGarageRecords } from '../utils/supabaseClient';
+import { getSupabaseGarageRecords, upsertCustomVehicleSupabase } from '../utils/supabaseClient';
 import {
   getActiveVehicleState,
   saveActiveVehicleState,
@@ -111,6 +112,85 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
   const [reminderTitleInput, setReminderTitleInput] = useState('');
   const [reminderDateInput, setReminderDateInput] = useState('');
   const [reminderNotesInput, setReminderNotesInput] = useState('');
+
+  // Modal para personalizar vehículo con el lápiz ✏️ y sincronización dual (Supabase + Local)
+  const [showCustomVehicleModal, setShowCustomVehicleModal] = useState(false);
+  const [customVehName, setCustomVehName] = useState('');
+  const [customVehCategory, setCustomVehCategory] = useState<'sedan' | 'suv' | 'compact' | 'pickup' | 'van' | 'custom'>('sedan');
+  const [customVehFuel, setCustomVehFuel] = useState<'Gasolina' | 'Diésel' | 'Gas GLP'>('Gasolina');
+  const [customVehConsumptionInput, setCustomVehConsumptionInput] = useState('');
+  const [customVehDisplacement, setCustomVehDisplacement] = useState('');
+  const [isSavingCustomVehicle, setIsSavingCustomVehicle] = useState(false);
+
+  const handleOpenCustomVehicleModal = () => {
+    setCustomVehName(activeVehicle.vehicleModelName || 'Mi Auto Personalizado');
+    setCustomVehCategory((activeVehicle.vehicleType as any) || 'sedan');
+    const f = (activeVehicle.fuelType || '').toLowerCase();
+    const resolvedFuel = (f.includes('glp') || f.includes('lpg') || f.includes('gas'))
+      ? 'Gas GLP'
+      : (f.includes('diesel') || f.includes('diésel') || f.includes('acpm'))
+      ? 'Diésel'
+      : 'Gasolina';
+    setCustomVehFuel(resolvedFuel);
+
+    // Formatear el consumo inicial según la unidad del país
+    if (selectedCountry === 'US') {
+      const mpg = activeVehicle.baseL100 > 0 ? 235.215 / activeVehicle.baseL100 : 32.0;
+      setCustomVehConsumptionInput(mpg.toFixed(1));
+    } else if (selectedCountry === 'CO') {
+      const kmL = activeVehicle.baseL100 > 0 ? 100 / activeVehicle.baseL100 : 13.5;
+      setCustomVehConsumptionInput(kmL.toFixed(1));
+    } else {
+      setCustomVehConsumptionInput(activeVehicle.baseL100.toFixed(1));
+    }
+
+    setCustomVehDisplacement(activeVehicle.displacement || '1.600 cc');
+    setShowCustomVehicleModal(true);
+  };
+
+  const handleSaveCustomVehicle = async () => {
+    if (!customVehName.trim()) return;
+    setIsSavingCustomVehicle(true);
+
+    const rawVal = parseFloat(customVehConsumptionInput.replace(',', '.')) || 7.5;
+    let baseL100 = rawVal;
+    if (selectedCountry === 'US') {
+      baseL100 = rawVal > 0 ? 235.215 / rawVal : 7.5;
+    } else if (selectedCountry === 'CO') {
+      baseL100 = rawVal > 0 ? 100 / rawVal : 7.5;
+    }
+
+    // 1. ESTADO LOCAL INMEDIATO (Garaje, Modo Marcha y Calcular sincronizados de inmediato)
+    const updatedState = saveActiveVehicleState({
+      vehicleType: customVehCategory,
+      vehicleModelName: customVehName.trim(),
+      engineName: `${customVehName.trim()} (${customVehDisplacement || 'Custom'})`,
+      displacement: customVehDisplacement || 'Motor Personalizado',
+      baseL100: Math.round(baseL100 * 10) / 10,
+      fuelType: customVehFuel,
+      transmission: activeVehicle.transmission || 'manual',
+    });
+
+    setActiveVehicle(updatedState);
+
+    // 2. SINCRONIZACIÓN CON SUPABASE (Directo a tabla vehicles con user_id)
+    try {
+      const targetUserId = currentUser?.uid || 'guest';
+      await upsertCustomVehicleSupabase(targetUserId, {
+        nombre: customVehName.trim(),
+        categoria: customVehCategory,
+        combustible: customVehFuel,
+        consumoBaseL100: Math.round(baseL100 * 10) / 10,
+        cilindrada: customVehDisplacement || '1.600 cc',
+        transmision: activeVehicle.transmission || 'manual',
+      });
+    } catch (err) {
+      console.warn('Error sincronizando con Supabase:', err);
+    } finally {
+      setIsSavingCustomVehicle(false);
+      setShowCustomVehicleModal(false);
+    }
+  };
 
   const [recordsCount, setRecordsCount] = useState<{
     mantenimiento: number;
@@ -633,6 +713,17 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
                 </p>
               </div>
             </div>
+
+            {/* BOTÓN LÁPIZ (✏️): Personalizar Vehículo y Sincronizar con Supabase */}
+            <button
+              type="button"
+              onClick={handleOpenCustomVehicleModal}
+              className="p-2.5 rounded-2xl bg-[#1A2234] hover:bg-[#FF4F00]/20 border border-slate-700/80 hover:border-[#FF4F00]/50 text-slate-300 hover:text-[#FF4F00] transition cursor-pointer active:scale-95 shadow-md flex items-center space-x-1.5 shrink-0"
+              title="Personalizar vehículo y guardar en Supabase"
+            >
+              <Pencil className="w-4 h-4 text-[#FF4F00]" />
+              <span className="text-[11px] font-black hidden sm:inline text-white">Editar</span>
+            </button>
           </div>
 
           {/* FOTO DEL CARRO O GRÁFICA 3D PROFESIONAL REAL CON OPCIÓN DE CÁMARA O GALERÍA */}
@@ -1523,6 +1614,167 @@ export const GarajeView: React.FC<GarajeViewProps> = ({
                 className="flex-1 py-3 rounded-2xl bg-[#FF4F00] text-white text-xs font-black cursor-pointer hover:bg-[#E04500] shadow-lg shadow-[#FF4F00]/30"
               >
                 Guardar Fecha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ---------------- MODAL 4: PERSONALIZACIÓN CON ÍCONO DE LÁPIZ (✏️) Y SUPABASE ---------------- */}
+      {showCustomVehicleModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-150">
+          <div className="bg-[#121620] border border-slate-700 w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2 text-white font-black text-sm">
+                <span className="text-lg">✏️</span>
+                <span>Personalizar Vehículo</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCustomVehicleModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Configura tu vehículo a medida. Al guardar, se sincronizará automáticamente con <span className="text-emerald-400 font-bold">Supabase</span> y se aplicará de inmediato en Modo Marcha y la Calculadora.
+            </p>
+
+            <div className="space-y-3">
+              {/* 1. Nombre del Vehículo */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-300">
+                  Nombre del Vehículo:
+                </label>
+                <input
+                  type="text"
+                  value={customVehName}
+                  onChange={(e) => setCustomVehName(e.target.value)}
+                  placeholder="Ej. Chevrolet Spark GT / Toyota Prado TXL"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-xs focus:outline-none focus:border-[#FF4F00]"
+                />
+              </div>
+
+              {/* 2. Carrocería */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-300">
+                  Carrocería:
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['sedan', 'suv', 'compact', 'pickup', 'van', 'custom'] as const).map((catKey) => {
+                    const isSel = customVehCategory === catKey;
+                    const catLabels: Record<string, string> = {
+                      sedan: 'Sedán',
+                      suv: 'SUV',
+                      compact: 'Hatchback',
+                      pickup: 'Pickup',
+                      van: 'Van',
+                      custom: 'Custom',
+                    };
+                    return (
+                      <button
+                        key={catKey}
+                        type="button"
+                        onClick={() => setCustomVehCategory(catKey)}
+                        className={`py-2 px-1 rounded-xl text-xs font-bold border transition cursor-pointer active:scale-95 ${
+                          isSel
+                            ? 'bg-[#FF4F00]/20 border-[#FF4F00] text-white shadow-sm'
+                            : 'bg-[#080B11] border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {catLabels[catKey]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Tipo de Combustible */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-300">
+                  Tipo de Combustible Activo:
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['Gasolina', 'Diésel', 'Gas GLP'] as const).map((fuelOpt) => {
+                    const isSel = customVehFuel === fuelOpt;
+                    const displayLabel =
+                      fuelOpt === 'Gas GLP'
+                        ? (selectedCountry === 'CO' ? '🔥 Gas GLP' : '🔥 LPG')
+                        : fuelOpt === 'Diésel'
+                        ? (selectedCountry === 'CO' ? '🛢️ Diésel' : selectedCountry === 'US' ? '🛢️ Diesel' : '🛢️ ON')
+                        : (selectedCountry === 'US' ? '⛽ Gas' : '⛽ Gasolina');
+                    return (
+                      <button
+                        key={fuelOpt}
+                        type="button"
+                        onClick={() => setCustomVehFuel(fuelOpt)}
+                        className={`py-2 px-1.5 rounded-xl text-[11px] font-black border transition cursor-pointer active:scale-95 ${
+                          isSel
+                            ? 'bg-[#FF4F00]/20 border-[#FF4F00] text-white shadow-sm'
+                            : 'bg-[#080B11] border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {displayLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. Consumo Base Mixto */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
+                  <span>Consumo Base Mixto:</span>
+                  <span className="text-[10px] text-[#FF4F00] font-mono">
+                    {selectedCountry === 'US' ? 'MPG' : selectedCountry === 'CO' ? 'km/L' : 'L/100 km'}
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={customVehConsumptionInput}
+                  onChange={(e) => setCustomVehConsumptionInput(e.target.value)}
+                  placeholder={selectedCountry === 'US' ? '32.0' : selectedCountry === 'CO' ? '13.5' : '7.2'}
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-mono font-bold text-xs focus:outline-none focus:border-[#FF4F00]"
+                />
+              </div>
+
+              {/* 5. Cilindrada / Motor */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-300">
+                  Cilindrada aproximada (cc / L):
+                </label>
+                <input
+                  type="text"
+                  value={customVehDisplacement}
+                  onChange={(e) => setCustomVehDisplacement(e.target.value)}
+                  placeholder="Ej. 1.600 cc / 2.0L VVT-i"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-xs focus:outline-none focus:border-[#FF4F00]"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowCustomVehicleModal(false)}
+                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-300 text-xs font-black cursor-pointer hover:bg-slate-700 active:scale-95 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustomVehicle}
+                disabled={isSavingCustomVehicle || !customVehName.trim()}
+                className="flex-1 py-3 rounded-2xl bg-[#FF4F00] hover:bg-[#E04500] text-white text-xs font-black cursor-pointer shadow-lg shadow-[#FF4F00]/30 active:scale-95 transition flex items-center justify-center space-x-1.5 disabled:opacity-50"
+              >
+                {isSavingCustomVehicle ? (
+                  <span>Sincronizando...</span>
+                ) : (
+                  <>
+                    <span>Guardar y Aplicar</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

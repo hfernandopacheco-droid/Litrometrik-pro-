@@ -597,28 +597,28 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
             {[
               {
                 id: 'gasolina',
-                name: 'Gasolina Pb95',
+                name: inputs.country === 'PL' ? 'Benzyna Pb95' : inputs.country === 'CO' ? 'Gasolina Corriente / Extra' : 'Gasoline Regular / Premium',
                 factorStr: 'x1.0',
-                note: 'Consumo base',
+                note: 'Consumo base 1.0',
                 price: countryData.preciosDefecto.gasolina,
               },
               {
                 id: 'diesel',
-                name: 'Diésel ON',
+                name: inputs.country === 'PL' ? 'Diesel / ON' : inputs.country === 'CO' ? 'Diésel / ACPM' : 'Diesel Fuel',
                 factorStr: 'x0.85',
                 note: '-15% consumo',
                 price: countryData.preciosDefecto.diesel,
               },
               {
                 id: 'lpg',
-                name: 'Gas LPG',
+                name: inputs.country === 'PL' ? 'LPG / Autogaz' : inputs.country === 'CO' ? 'Gas GLP / Vehicular' : 'LPG / Propane',
                 factorStr: 'x1.20',
-                note: '+20% consumo',
+                note: '+15% a +20% consumo',
                 price: countryData.preciosDefecto.lpg,
               },
               {
                 id: 'hibrido',
-                name: 'Híbrido / GNC',
+                name: inputs.country === 'CO' ? 'Gas GNV / Híbrido' : 'Híbrido HEV / PHEV',
                 factorStr: 'x0.75',
                 note: '-25% consumo',
                 price: countryData.preciosDefecto.gasolina,
@@ -1386,7 +1386,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
       )}
       {/* Modal Informativo Detallado del Motor (?) */}
       {selectedEngineForInfo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[90] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-[#131927] border border-slate-700/80 rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between">
               <div>

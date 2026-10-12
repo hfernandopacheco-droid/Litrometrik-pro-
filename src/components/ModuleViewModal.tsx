@@ -1270,8 +1270,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
               >
                 <option value="PL">🇵🇱 Polonia</option>
                 <option value="CO">🇨🇴 Colombia</option>
-                <option value="ES">🇪🇸 España</option>
-                <option value="MX">🇲🇽 México</option>
+                <option value="US">🇺🇸 Estados Unidos</option>
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-3 pointer-events-none" />
             </div>

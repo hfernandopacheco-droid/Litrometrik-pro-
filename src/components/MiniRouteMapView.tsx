@@ -13,8 +13,7 @@ interface MiniRouteMapViewProps {
 const COUNTRY_COORDS: Record<string, { lat: number; lng: number; name: string }> = {
   PL: { lat: 52.2297, lng: 21.0122, name: 'Varsovia' }, // Warsaw
   CO: { lat: 4.7110, lng: -74.0721, name: 'Bogotá' },
-  ES: { lat: 40.4168, lng: -3.7038, name: 'Madrid' },
-  MX: { lat: 19.4326, lng: -99.1332, name: 'Ciudad de México' },
+  US: { lat: 39.8283, lng: -98.5795, name: 'Estados Unidos' },
 };
 
 /**

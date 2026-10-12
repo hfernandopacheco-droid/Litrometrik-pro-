@@ -229,7 +229,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     setNotification(
       nextState
         ? `❄️ Aire A/C Encendido (+${acAddonAmount.toFixed(1)} L/100km)`
-        : '💨 Aire A/C Apagado (Modo Eco)'
+        : '💨 Aire A/C Apagado'
     );
     setTimeout(() => setNotification(null), 2500);
   };
@@ -3495,7 +3495,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       {selectedClusterCardInfo && typeof document !== 'undefined' && createPortal(
         <div
           onClick={() => setSelectedClusterCardInfo(null)}
-          className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[90] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -3635,11 +3635,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         document.body
       )}
 
-      {/* Modal Informativo Detallado del Motor (?) con Portal en z-[80] y backdrop independiente */}
+      {/* Modal Informativo Detallado del Motor (?) con Portal en z-[90] y backdrop independiente */}
       {selectedEngineForInfo && typeof document !== 'undefined' && createPortal(
         <div
           onClick={() => setSelectedEngineForInfo(null)}
-          className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[90] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}
