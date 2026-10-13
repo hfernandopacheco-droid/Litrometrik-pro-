@@ -977,27 +977,39 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
             ? 'Diésel ON'
             : 'Gasolina Pb95';
 
-        // 1. Actualizar tanks por país para que los botones de Modo Marcha se sincronicen
+        // 1. FÓRMULA DE PROMEDIO PONDERADO AL REGISTRAR TANQUEO
         let nextTankBal = addedCost;
+        let finalWeightedPrice = refuelPrice;
         try {
           const tanksRaw = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
           const tanksMap = tanksRaw ? JSON.parse(tanksRaw) : {};
           const prevTank = tanksMap[targetFuelKey] || { balance: 0, liters: 0 };
-          const prevBal = Number(prevTank.balance) || 0;
-          nextTankBal = Math.round((prevBal + addedCost) * 100) / 100;
-          const prevLit = Number(prevTank.liters) || 0;
-          const nextTankLit = Math.round((prevLit + refuelLitersNum) * 100) / 100;
+          const volumenPrevio = Number(prevTank.liters) || 0;
+          const saldoPrevio = Number(prevTank.balance) || 0;
+          const litrosNuevos = refuelLitersNum;
+          const dineroNuevo = addedCost;
+
+          const nuevoVolumenTotal = Math.round((volumenPrevio + litrosNuevos) * 100) / 100;
+          const nuevoSaldoTotal = Math.round((saldoPrevio + dineroNuevo) * 100) / 100;
+          finalWeightedPrice = nuevoVolumenTotal > 0
+            ? Math.round((nuevoSaldoTotal / nuevoVolumenTotal) * 100) / 100
+            : (refuelPrice > 0 ? refuelPrice : 6.09);
+
+          nextTankBal = nuevoSaldoTotal;
 
           tanksMap[targetFuelKey] = {
             ...prevTank,
-            balance: nextTankBal,
-            liters: nextTankLit,
-            lastRefuelAmount: addedCost,
-            lastRefuelPrice: refuelPrice,
+            balance: nuevoSaldoTotal,
+            liters: nuevoVolumenTotal,
+            weightedPrice: finalWeightedPrice,
+            lastRefuelAmount: dineroNuevo,
+            lastRefuelPrice: finalWeightedPrice,
             lastRefuelDate: new Date().toISOString(),
           };
           localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(tanksMap));
-          localStorage.setItem('litrometrik_base_fuel_balance_pln', nextTankBal.toString());
+          localStorage.setItem('litrometrik_base_fuel_balance_pln', nuevoSaldoTotal.toString());
+          localStorage.setItem('fuel_price_per_liter', finalWeightedPrice.toString());
+          localStorage.setItem(`litrometrik_weighted_price_${targetFuelKey}`, finalWeightedPrice.toString());
         } catch (_) {}
 
         // 2. Guardar último tanqueo para el aviso de Saldo Restante y sincronizar con historial_viajes
@@ -1013,7 +1025,7 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
             litros: refuelLitersNum,
             costo: addedCost,
             combustible: targetFuelKey,
-            precioLitro: refuelPrice,
+            precioLitro: finalWeightedPrice,
             moneda: activeCountryInfo.currency,
             pais: selectedCountry,
             vehicleType: 'sedan',
@@ -1036,13 +1048,13 @@ export const CategoryDetailView: React.FC<CategoryDetailProps> = ({
         localStorage.setItem('fuel_balance_pln', updatedBalance.toString());
         localStorage.setItem('currentFuelBalancePLN', updatedBalance.toString());
 
-        // 4. Actualizar precio de combustible
-        if (refuelPrice > 0) {
-          localStorage.setItem('fuel_price_per_liter', refuelPrice.toString());
+        // 4. Actualizar precio de combustible con el precio ponderado
+        if (finalWeightedPrice > 0) {
+          localStorage.setItem('fuel_price_per_liter', finalWeightedPrice.toString());
           try {
             const storedPrices = localStorage.getItem('litrometrik_custom_fuel_prices');
             const pricesMap = storedPrices ? JSON.parse(storedPrices) : {};
-            pricesMap[targetFuelKey] = refuelPrice;
+            pricesMap[targetFuelKey] = finalWeightedPrice;
             localStorage.setItem('litrometrik_custom_fuel_prices', JSON.stringify(pricesMap));
           } catch (_) {}
         }

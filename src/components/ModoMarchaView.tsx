@@ -71,6 +71,7 @@ export type FuelKey = 'Gasolina Pb95' | 'Diésel ON' | 'Gas LPG';
 export interface FuelTankData {
   balance: number;
   liters: number;
+  weightedPrice?: number;
   lastRefuelAmount?: number;
   lastRefuelPrice?: number;
   lastRefuelDate?: string;
@@ -512,6 +513,24 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     } catch (_) {}
   }, [selectedCountry]);
 
+  // Active Tank & Weighted Average Price (Tarifa exacta con la que se descuenta tu dinero mientras conduces)
+  const activeTank = fuelTanks[activeFuel];
+  const activeWeightedPrice = useMemo(() => {
+    if (activeTank && activeTank.liters > 0 && activeTank.balance > 0) {
+      return Math.round((activeTank.balance / activeTank.liters) * 100) / 100;
+    }
+    if (activeTank && typeof activeTank.weightedPrice === 'number' && activeTank.weightedPrice > 0) {
+      return Math.round(activeTank.weightedPrice * 100) / 100;
+    }
+    return fuelPrice > 0 ? fuelPrice : (fuelPrices[activeFuel] || defaultPrices[selectedCountry]?.[activeFuel] || 6.09);
+  }, [activeTank, activeFuel, fuelPrice, fuelPrices, selectedCountry]);
+
+  // Keep fuelPriceRef aligned to activeWeightedPrice
+  useEffect(() => {
+    fuelPriceRef.current = activeWeightedPrice;
+    setFuelPrice(activeWeightedPrice);
+  }, [activeWeightedPrice]);
+
   // Reactive Tank Deductions for active fuel (No negative numbers)
   const activeBaseBalance = fuelTanks[activeFuel]?.balance ?? 114.38;
   const currentFuelBalance = useMemo(() => {
@@ -523,8 +542,8 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     if (typeof tankLit === 'number' && tankLit > 0) {
       return tankLit;
     }
-    return fuelPrice > 0 ? activeBaseBalance / fuelPrice : 0;
-  }, [fuelTanks, activeFuel, activeBaseBalance, fuelPrice]);
+    return activeWeightedPrice > 0 ? activeBaseBalance / activeWeightedPrice : 0;
+  }, [fuelTanks, activeFuel, activeBaseBalance, activeWeightedPrice]);
 
   const currentRemainingLiters = useMemo(() => {
     return Math.max(0, Math.round((activeTankVolumeLiters - liveLiters) * 100) / 100);
@@ -592,10 +611,13 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
   const [showRefuelModal, setShowRefuelModal] = useState(false);
   const [refuelFuelType, setRefuelFuelType] = useState<FuelKey>(activeFuel);
   const [refuelAmountInput, setRefuelAmountInput] = useState('');
+  const [refuelLitersInput, setRefuelLitersInput] = useState('');
   const [refuelPriceInput, setRefuelPriceInput] = useState('');
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [adjustBalanceInput, setAdjustBalanceInput] = useState('');
   const [adjustLitersInput, setAdjustLitersInput] = useState('');
+  const [showWeightedPriceModal, setShowWeightedPriceModal] = useState(false);
+  const [isMathExplanationOpen, setIsMathExplanationOpen] = useState(true);
 
   // Último tanqueo guardado reactivo
   const [ultimoTanqueo, setUltimoTanqueo] = useState<any>(() => {
@@ -609,8 +631,17 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
   const handleSelectRefuelFuel = (fuel: FuelKey) => {
     setRefuelFuelType(fuel);
-    const p = fuelPrices[fuel] || defaultPrices[selectedCountry]?.[fuel] || 6.09;
-    setRefuelPriceInput(p.toFixed(2));
+    const targetTank = fuelTanks[fuel];
+    const tankWeighted = (targetTank && targetTank.liters > 0 && targetTank.balance > 0)
+      ? targetTank.balance / targetTank.liters
+      : (targetTank?.weightedPrice || fuelPrices[fuel] || defaultPrices[selectedCountry]?.[fuel] || 6.09);
+    setRefuelPriceInput(tankWeighted.toFixed(2));
+    if (refuelAmountInput && !isNaN(parseFloat(refuelAmountInput))) {
+      const amt = parseFloat(refuelAmountInput.replace(',', '.'));
+      if (tankWeighted > 0) {
+        setRefuelLitersInput((amt / tankWeighted).toFixed(2));
+      }
+    }
   };
 
   // Toast Notification
@@ -1382,12 +1413,16 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     }
 
     const targetBal = latestMap[targetFuel]?.balance ?? 0;
-    const p = fuelPrices[targetFuel] || defaultPrices[selectedCountry]?.[targetFuel] || 2.89;
+    const targetTank = latestMap[targetFuel];
+    const p = (targetTank && targetTank.liters > 0 && targetTank.balance > 0)
+      ? Math.round((targetTank.balance / targetTank.liters) * 100) / 100
+      : (targetTank?.weightedPrice || fuelPrices[targetFuel] || defaultPrices[selectedCountry]?.[targetFuel] || 2.89);
 
     try {
       localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(latestMap));
       localStorage.setItem('litrometrik_active_fuel', targetFuel);
       localStorage.setItem('fuel_price_per_liter', p.toString());
+      localStorage.setItem(`litrometrik_weighted_price_${targetFuel}`, p.toString());
       localStorage.setItem('litrometrik_base_fuel_balance_pln', targetBal.toString());
       localStorage.setItem('litrometrik_fuel_balance_pln', targetBal.toFixed(2));
       localStorage.setItem('fuel_balance_pln', targetBal.toFixed(2));
@@ -1502,23 +1537,29 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // ---------------- TANK REFUEL & ADJUST (PER-FUEL TANK SYNC) ----------------
+  // ---------------- TANK REFUEL & ADJUST (PER-FUEL TANK SYNC & PRECIO PROMEDIO PONDERADO) ----------------
   const handleSaveRefuel = () => {
-    const amount = parseFloat(refuelAmountInput.replace(',', '.'));
+    const rawAmount = parseFloat(refuelAmountInput.replace(',', '.'));
+    const rawLiters = parseFloat(refuelLitersInput.replace(',', '.'));
     const enteredPrice = parseFloat(refuelPriceInput.replace(',', '.'));
     const targetFuelKey = (refuelFuelType as FuelKey) || activeFuel;
-    const finalPrice = !isNaN(enteredPrice) && enteredPrice > 0
+
+    const currentPriceRef = !isNaN(enteredPrice) && enteredPrice > 0
       ? Math.round(enteredPrice * 100) / 100
       : (fuelPrices[targetFuelKey] || fuelPrice);
 
-    if (isNaN(amount) || amount <= 0) return;
+    let dineroNuevo = !isNaN(rawAmount) && rawAmount > 0 ? Math.round(rawAmount * 100) / 100 : 0;
+    let litrosNuevos = !isNaN(rawLiters) && rawLiters > 0 ? Math.round(rawLiters * 100) / 100 : 0;
 
-    // 1. Actualización global del precio para ese tipo de combustible
-    updateGlobalFuelPrice(targetFuelKey, finalPrice);
+    if (dineroNuevo <= 0 && litrosNuevos > 0 && currentPriceRef > 0) {
+      dineroNuevo = Math.round(litrosNuevos * currentPriceRef * 100) / 100;
+    } else if (litrosNuevos <= 0 && dineroNuevo > 0 && currentPriceRef > 0) {
+      litrosNuevos = Math.round((dineroNuevo / currentPriceRef) * 100) / 100;
+    }
 
-    const addedLiters = finalPrice > 0 ? Math.round((amount / finalPrice) * 100) / 100 : 0;
+    if (dineroNuevo <= 0 && litrosNuevos <= 0) return;
 
-    // 2. Leer mapa más reciente para evitar sobreescritura de tanques
+    // 1. Leer mapa más reciente para evitar sobreescritura de tanques
     let currentMap: FuelTankMap = { ...fuelTanks };
     try {
       const stored = localStorage.getItem(`litrometrik_tanks_${selectedCountry}`);
@@ -1527,8 +1568,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
       }
     } catch (_) {}
 
-    // Si el combustible a tanquear es el actualmente activo, su base es el saldo actual (restando consumo en vivo)
-    // Si es otro combustible, el combustible previo conserva su saldo descontado
+    // Si el combustible a tanquear no es el activo y hay gasto acumulado en curso, preservar saldo del activo
     if (targetFuelKey !== activeFuel && (liveCost > 0 || liveLiters > 0)) {
       const curActive = currentMap[activeFuel] || { balance: 0, liters: 0 };
       currentMap[activeFuel] = {
@@ -1539,41 +1579,64 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
     }
 
     const prevTank = currentMap[targetFuelKey] || { balance: 0, liters: 0 };
-    const prevBal = targetFuelKey === activeFuel ? currentFuelBalance : (Number(prevTank.balance) || 0);
-    const nextBal = Math.round((prevBal + amount) * 100) / 100;
-    const prevLit = targetFuelKey === activeFuel ? currentRemainingLiters : (Number(prevTank.liters) || (finalPrice > 0 ? prevBal / finalPrice : 0));
-    const nextLit = Math.round((prevLit + addedLiters) * 100) / 100;
+
+    // FÓRMULA DE PROMEDIO PONDERADO AL REGISTRAR TANQUEO:
+    // * Volumen Previo = litros actualmente en el tanque seleccionado
+    const volumenPrevio = targetFuelKey === activeFuel
+      ? currentRemainingLiters
+      : (Number(prevTank.liters) || (currentPriceRef > 0 ? Number(prevTank.balance) / currentPriceRef : 0));
+
+    // * Saldo Previo = saldo monetario restante en el tanque
+    const saldoPrevio = targetFuelKey === activeFuel
+      ? currentFuelBalance
+      : (Number(prevTank.balance) || 0);
+
+    // * Nuevo Volumen Total = Volumen Previo + Litros Nuevos
+    const nuevoVolumenTotal = Math.round((volumenPrevio + litrosNuevos) * 100) / 100;
+
+    // * Nuevo Saldo Total = Saldo Previo + Dinero Nuevo
+    const nuevoSaldoTotal = Math.round((saldoPrevio + dineroNuevo) * 100) / 100;
+
+    // * Precio Ponderado por Litro = Nuevo Saldo Total / Nuevo Volumen Total
+    const precioPonderadoPorLitro = nuevoVolumenTotal > 0
+      ? Math.round((nuevoSaldoTotal / nuevoVolumenTotal) * 100) / 100
+      : currentPriceRef;
+
+    // Guarda este 'Precio Ponderado por Litro' como el precio activo oficial del combustible seleccionado
+    updateGlobalFuelPrice(targetFuelKey, precioPonderadoPorLitro);
 
     const nextMap: FuelTankMap = {
       ...currentMap,
       [targetFuelKey]: {
-        balance: nextBal,
-        liters: nextLit,
-        lastRefuelAmount: amount,
-        lastRefuelPrice: finalPrice,
+        balance: nuevoSaldoTotal,
+        liters: nuevoVolumenTotal,
+        weightedPrice: precioPonderadoPorLitro,
+        lastRefuelAmount: dineroNuevo,
+        lastRefuelPrice: precioPonderadoPorLitro,
         lastRefuelDate: new Date().toISOString(),
       },
     };
 
-    // 3. Persistir INMEDIATAMENTE en localStorage antes de emitir ningún evento
+    // Persistir INMEDIATAMENTE en localStorage antes de emitir ningún evento
     try {
       localStorage.setItem(`litrometrik_tanks_${selectedCountry}`, JSON.stringify(nextMap));
-      localStorage.setItem('litrometrik_base_fuel_balance_pln', nextBal.toString());
-      localStorage.setItem('litrometrik_fuel_balance_pln', nextBal.toFixed(2));
-      localStorage.setItem('fuel_balance_pln', nextBal.toFixed(2));
-      localStorage.setItem('currentFuelBalancePLN', nextBal.toFixed(2));
+      localStorage.setItem('litrometrik_base_fuel_balance_pln', nuevoSaldoTotal.toString());
+      localStorage.setItem('litrometrik_fuel_balance_pln', nuevoSaldoTotal.toFixed(2));
+      localStorage.setItem('fuel_balance_pln', nuevoSaldoTotal.toFixed(2));
+      localStorage.setItem('currentFuelBalancePLN', nuevoSaldoTotal.toFixed(2));
       localStorage.setItem('litrometrik_active_fuel', targetFuelKey);
-      localStorage.setItem('fuel_price_per_liter', finalPrice.toString());
+      localStorage.setItem('fuel_price_per_liter', precioPonderadoPorLitro.toString());
+      localStorage.setItem(`litrometrik_weighted_price_${targetFuelKey}`, precioPonderadoPorLitro.toString());
     } catch (_) {}
 
     // Actualizar estado reactivo de tanques
     setFuelTanks(nextMap);
 
-    // 4. Activar de inmediato ese combustible para reflejar el saldo en su botón, pantalla y modo en vivo
+    // Activar de inmediato ese combustible para reflejar el saldo en su botón, pantalla y modo en vivo
     setActiveFuel(targetFuelKey);
     activeFuelRef.current = targetFuelKey;
-    setFuelPrice(finalPrice);
-    fuelPriceRef.current = finalPrice;
+    setFuelPrice(precioPonderadoPorLitro);
+    fuelPriceRef.current = precioPonderadoPorLitro;
     setLiveCost(0);
     setLiveLiters(0);
 
@@ -1594,12 +1657,12 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         pais: selectedCountry,
         moneda: currency,
         odometer: 145500 + Math.round(distanceKm),
-        cost: amount,
+        cost: dineroNuevo,
         title: `Repostaje ${shortName}`,
         station: defaultStation,
         fuelType: targetFuelKey,
-        liters: addedLiters,
-        pricePerLiter: finalPrice,
+        liters: litrosNuevos,
+        pricePerLiter: precioPonderadoPorLitro,
         kmSinceLastRefuel: Math.round(distanceKm || 320),
         consumptionL100: baseConsumptionL100,
         refuelDate: new Date().toISOString().split('T')[0],
@@ -1618,10 +1681,10 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         timestamp: newRefuelEntry.createdAt,
         date: newRefuelEntry.refuelDate,
         km: 0,
-        litros: addedLiters,
-        costo: amount,
+        litros: litrosNuevos,
+        costo: dineroNuevo,
         combustible: targetFuelKey,
-        precioLitro: finalPrice,
+        precioLitro: precioPonderadoPorLitro,
         moneda: currency,
         pais: selectedCountry,
         vehicleType: vehicleType,
@@ -1641,21 +1704,31 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         saveCloudRecord(uid, 'repostajes', newRefuelEntry);
         insertSupabaseRefuel(uid, {
           estacion: defaultStation,
-          litros: addedLiters,
-          precio_por_litro: finalPrice,
-          costo_total: amount,
+          litros: litrosNuevos,
+          precio_por_litro: precioPonderadoPorLitro,
+          costo_total: dineroNuevo,
           odometro: 145500 + Math.round(distanceKm),
           combustible: targetFuelKey,
-          notas: `Repostaje ${shortName} desde Modo Marcha`,
+          notas: `Repostaje ${shortName} (Precio ponderado: ${precioPonderadoPorLitro.toFixed(2)} ${currency}/L)`,
         }).catch((e) => console.warn('Supabase refuel sync notice:', e));
 
         saveCloudVehicleConfig(uid, {
-          fuelBalance: Math.max(0, nextBal - (targetFuelKey === activeFuel ? liveCost : 0)),
-          fuelPricePerLiter: finalPrice,
+          fuelBalance: nuevoSaldoTotal,
+          fuelPricePerLiter: precioPonderadoPorLitro,
           lastFuelType: targetFuelKey,
         });
       }
 
+      window.dispatchEvent(new CustomEvent('litrometrik-prices-updated', { detail: { fuel: targetFuelKey, price: precioPonderadoPorLitro } }));
+      window.dispatchEvent(new CustomEvent('litrometrik-fuel-updated', {
+        detail: {
+          balance: nuevoSaldoTotal,
+          price: precioPonderadoPorLitro,
+          fuelType: targetFuelKey,
+          liters: nuevoVolumenTotal,
+          addedCost: dineroNuevo,
+        }
+      }));
       window.dispatchEvent(new Event('fuel-storage-updated'));
       window.dispatchEvent(new Event('storage'));
       window.dispatchEvent(new CustomEvent('litrometrik-records-updated'));
@@ -1663,8 +1736,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
     setShowRefuelModal(false);
     setRefuelAmountInput('');
+    setRefuelLitersInput('');
     const shortName = targetFuelKey === 'Gas LPG' ? 'LPG' : targetFuelKey === 'Diésel ON' ? 'Diésel' : 'Gasolina';
-    setNotification(`⛽ ¡Tanque de ${shortName} recargado con +${amount} ${currency}! (+${addedLiters.toFixed(2)} L @ ${finalPrice.toFixed(2)}/L)`);
+    setNotification(`⛽ ¡Tanque de ${shortName} recargado con +${dineroNuevo} ${currency}! (+${litrosNuevos.toFixed(2)} L @ ${precioPonderadoPorLitro.toFixed(2)}/L ponderado)`);
     setTimeout(() => setNotification(null), 3500);
   };
 
@@ -2506,17 +2580,39 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         >
           {/* Header con tabs para cambiar entre Gasolina, LPG o Diésel y ver el saldo de cada uno */}
           <div className="space-y-2.5">
-            <div
-              onClick={() => setSelectedClusterCardInfo('tanque')}
-              className="flex items-center justify-between flex-wrap gap-2 cursor-pointer group"
-              title="Toca para ver explicación de Reserva de Tanque y Combustible Activo"
-            >
-              <span className="text-[11px] font-black tracking-widest text-slate-400 uppercase group-hover:text-amber-400 transition">
-                SALDO RESTANTE EN TANQUE
-              </span>
-              <div className="flex items-center space-x-1 px-3 py-1 rounded-full bg-[#1A202C] border border-slate-700/80 text-xs font-sans font-bold text-slate-200 group-hover:border-amber-400/60 transition">
-                <span>💧</span>
-                <span>{currentRemainingLiters.toFixed(2).replace('.', ',')} L</span>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div
+                onClick={() => setSelectedClusterCardInfo('tanque')}
+                className="cursor-pointer group flex items-center"
+                title="Toca para ver explicación de Reserva de Tanque y Combustible Activo"
+              >
+                <span className="text-[11px] font-black tracking-widest text-slate-400 uppercase group-hover:text-amber-400 transition">
+                  SALDO RESTANTE EN TANQUE
+                </span>
+              </div>
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                <div
+                  onClick={() => setSelectedClusterCardInfo('tanque')}
+                  className="flex items-center space-x-1 px-3 py-1 rounded-full bg-[#1A202C] border border-slate-700/80 text-xs font-sans font-bold text-slate-200 cursor-pointer hover:border-amber-400/60 transition"
+                  title="Litros restantes en el tanque activo"
+                >
+                  <span>💧</span>
+                  <span>{currentRemainingLiters.toFixed(2).replace('.', ',')} L</span>
+                </div>
+
+                {/* Pastilla Interactiva del Precio Ponderado Actual */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowWeightedPriceModal(true);
+                  }}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-slate-800/80 border border-white/10 text-xs font-sans font-bold text-slate-200 cursor-pointer hover:border-amber-500/50 hover:bg-slate-800 transition active:scale-95 shadow-sm"
+                  title="Toca para ver la explicación del Precio Ponderado del Tanque Activo"
+                >
+                  <span>🏷️</span>
+                  <span>{activeWeightedPrice.toFixed(2).replace('.', ',')} {currency}/L</span>
+                </button>
               </div>
             </div>
 
@@ -3328,19 +3424,51 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">
-                    Monto pagado ({currency})
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="Ej. 100.00"
-                    value={refuelAmountInput}
-                    onChange={(e) => setRefuelAmountInput(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-base focus:outline-none focus:border-[#FF4F00]"
-                    autoFocus
-                  />
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">
+                      Dinero pagado ({currency})
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Ej. 60.00"
+                      value={refuelAmountInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRefuelAmountInput(val);
+                        const num = parseFloat(val.replace(',', '.'));
+                        const p = parseFloat(refuelPriceInput.replace(',', '.')) || (fuelPrices[refuelFuelType] || fuelPrice);
+                        if (!isNaN(num) && p > 0) {
+                          setRefuelLitersInput((num / p).toFixed(2));
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-sm focus:outline-none focus:border-[#FF4F00]"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">
+                      Litros nuevos (L)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Ej. 20.00"
+                      value={refuelLitersInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRefuelLitersInput(val);
+                        const num = parseFloat(val.replace(',', '.'));
+                        const p = parseFloat(refuelPriceInput.replace(',', '.')) || (fuelPrices[refuelFuelType] || fuelPrice);
+                        if (!isNaN(num) && p > 0) {
+                          setRefuelAmountInput((num * p).toFixed(2));
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-sans font-bold text-sm focus:outline-none focus:border-[#FF4F00]"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -3351,26 +3479,53 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                     type="text"
                     inputMode="decimal"
                     value={refuelPriceInput}
-                    onChange={(e) => setRefuelPriceInput(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRefuelPriceInput(val);
+                      const p = parseFloat(val.replace(',', '.'));
+                      const lit = parseFloat(refuelLitersInput.replace(',', '.'));
+                      if (!isNaN(p) && p > 0 && !isNaN(lit) && lit > 0) {
+                        setRefuelAmountInput((lit * p).toFixed(2));
+                      }
+                    }}
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-[#080B11] border border-slate-700 text-white font-mono font-bold text-base focus:outline-none focus:border-[#FF4F00]"
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block">
-                    💡 Al cambiar este valor, se actualiza el precio global de {refuelFuelType} en toda la app.
+                    💡 Se mezclará con tu saldo y litros actuales para generar el nuevo Precio Promedio Ponderado oficial.
                   </span>
                 </div>
 
-                {refuelAmountInput && parseFloat(refuelAmountInput.replace(',', '.')) > 0 && (
-                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-400 flex items-center justify-between font-sans">
-                    <span>Equivalente:</span>
-                    <span>
-                      ~{(
-                        parseFloat(refuelAmountInput.replace(',', '.')) /
-                        (parseFloat(refuelPriceInput.replace(',', '.')) || (fuelPrices[refuelFuelType] || fuelPrice))
-                      ).toFixed(2)}{' '}
-                      Litros ({refuelFuelType})
-                    </span>
-                  </div>
-                )}
+                {/* Previsualización en Vivo de la Fórmula de Precio Promedio Ponderado */}
+                {(() => {
+                  const amt = parseFloat(refuelAmountInput.replace(',', '.')) || 0;
+                  const lit = parseFloat(refuelLitersInput.replace(',', '.')) || 0;
+                  if (amt <= 0 && lit <= 0) return null;
+
+                  const targetTank = fuelTanks[refuelFuelType] || { balance: 0, liters: 0 };
+                  const prevVol = refuelFuelType === activeFuel ? currentRemainingLiters : (Number(targetTank.liters) || 0);
+                  const prevSal = refuelFuelType === activeFuel ? currentFuelBalance : (Number(targetTank.balance) || 0);
+                  const totVol = prevVol + lit;
+                  const totSal = prevSal + amt;
+                  const pond = totVol > 0 ? (totSal / totVol) : (parseFloat(refuelPriceInput.replace(',', '.')) || 0);
+
+                  return (
+                    <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1.5 font-sans">
+                      <div className="flex items-center justify-between font-black">
+                        <span className="flex items-center space-x-1">
+                          <span>🏷️</span>
+                          <span>Nuevo Precio Ponderado:</span>
+                        </span>
+                        <span className="text-sm font-mono font-black text-emerald-400">
+                          {pond.toFixed(2).replace('.', ',')} {currency}/L
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex items-center justify-between pt-0.5 border-t border-amber-500/20">
+                        <span>Volumen total: {totVol.toFixed(2).replace('.', ',')} L</span>
+                        <span>Nuevo saldo: {totSal.toFixed(2).replace('.', ',')} {currency}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -3707,6 +3862,145 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             >
               Cerrar
             </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Explicativo del Precio Ponderado del Tanque Activo (z-[90] con fondo oscuro desenfocado) */}
+      {showWeightedPriceModal && typeof document !== 'undefined' && createPortal(
+        <div
+          onClick={() => setShowWeightedPriceModal(false)}
+          className="fixed inset-0 z-[90] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#121620] border border-slate-700/80 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
+          >
+            {/* A. CABECERA */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 bg-[#121620] shrink-0">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">🏷️</span>
+                <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
+                  Precio Ponderado del Tanque Activo
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWeightedPriceModal(false)}
+                className="p-1.5 rounded-xl bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 transition cursor-pointer"
+                aria-label="Cerrar modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Contenido con Scroll */}
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+              {/* B. TARJETA DE RESUMEN */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#1A2234] to-[#0E131F] border border-amber-500/30 shadow-lg space-y-3">
+                <div className="text-[11px] font-black tracking-widest text-amber-400 uppercase flex items-center justify-between">
+                  <span>RESUMEN DEL COMBUSTIBLE ACTIVO</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px]">
+                    {activeFuel}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+                  <div className="p-2.5 rounded-xl bg-[#0B0F19]/80 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-medium">Volumen restante</span>
+                    <span className="text-xs sm:text-sm font-black font-sans text-cyan-300">
+                      {currentRemainingLiters.toFixed(2).replace('.', ',')} L
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#0B0F19]/80 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-medium">Saldo restante</span>
+                    <span className="text-xs sm:text-sm font-black font-sans text-amber-400">
+                      {currentFuelBalance.toFixed(2).replace('.', ',')} {currency}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#0B0F19]/80 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.15)]">
+                    <span className="text-[10px] text-slate-400 block font-medium">Precio ponderado</span>
+                    <span className="text-xs sm:text-sm font-black font-mono text-emerald-400">
+                      {activeWeightedPrice.toFixed(2).replace('.', ',')} {currency}/L
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* C. EXPLICACIÓN GENERAL */}
+              <div className="p-4 rounded-2xl bg-[#080B11] border border-slate-800 text-xs text-slate-300 leading-relaxed">
+                Este es el costo real por litro dentro de tu tanque. Se actualiza automáticamente cada vez que registras un nuevo tanqueo mezclando los litros que te quedaban con los litros nuevos comprados. Es la tarifa exacta con la que se descuenta tu dinero mientras conduces.
+              </div>
+
+              {/* D. BLOQUE DESPLEGABLE O SECCIÓN "¿CÓMO SE CALCULA ESTE PRECIO?" */}
+              <div className="rounded-2xl border border-slate-800 bg-[#0A0E17] overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsMathExplanationOpen(!isMathExplanationOpen)}
+                  className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-800/40 transition cursor-pointer"
+                >
+                  <span className="text-xs sm:text-sm font-black text-amber-400 flex items-center space-x-2">
+                    <span className="w-5 h-5 rounded-full bg-amber-400/20 text-amber-300 flex items-center justify-center text-xs font-black">
+                      ❓
+                    </span>
+                    <span>¿Cómo se calcula matemáticamente?</span>
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                      isMathExplanationOpen ? 'rotate-180 text-amber-400' : ''
+                    }`}
+                  />
+                </button>
+
+                {isMathExplanationOpen && (
+                  <div className="p-4 pt-1 border-t border-slate-800/60 text-xs text-slate-300 space-y-3">
+                    <div className="space-y-1.5 pl-2 border-l-2 border-amber-500/50">
+                      <p className="font-semibold text-slate-200">
+                        1. Se toma el dinero que ya tenías en el tanque más el dinero que pagaste en el nuevo tanqueo.
+                      </p>
+                      <p className="font-semibold text-slate-200">
+                        2. Se toma el volumen de litros que ya tenías más los litros nuevos que compraste.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-700/80 text-center space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                        Fórmula Oficial de Promedio Ponderado
+                      </span>
+                      <div className="font-mono font-bold text-amber-300 text-xs sm:text-sm">
+                        Precio Ponderado = (Dinero Total Acumulado) ÷ (Litros Totales Acumulados)
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1.5 text-slate-300">
+                      <div className="text-[11px] font-black text-emerald-400 flex items-center space-x-1">
+                        <span>💡</span>
+                        <span>Ejemplo práctico:</span>
+                      </div>
+                      <p className="leading-relaxed">
+                        Si te quedaban <strong className="text-white">10 L a 2,80 {currency} (28 {currency})</strong> y le agregas <strong className="text-white">20 L a 3,10 {currency} (62 {currency})</strong>:
+                      </p>
+                      <ul className="list-disc list-inside space-y-0.5 text-emerald-200/90 pl-1">
+                        <li>Tienes <strong>30 Litros</strong> en total.</li>
+                        <li>Pagaste <strong>90 {currency}</strong> en total.</li>
+                        <li>Tu precio ponderado pasa a ser exactamente <strong>3,00 {currency}/L</strong> (90 ÷ 30).</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-800 bg-[#0C101A] shrink-0 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowWeightedPriceModal(false)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs hover:brightness-110 active:scale-95 transition cursor-pointer"
+              >
+                Entendido
+              </button>
+            </div>
           </div>
         </div>,
         document.body

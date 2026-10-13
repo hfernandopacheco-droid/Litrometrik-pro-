@@ -22,7 +22,7 @@ import { AuthGate } from './components/AuthGate';
 import { SplashScreen } from './components/SplashScreen';
 import { UpdateBanner } from './components/UpdateBanner';
 import { CalculatorInputs, SavedTrip } from './types';
-import { calculateTrip } from './utils/calculator';
+import { calculateTrip, getWeightedFuelPrice } from './utils/calculator';
 import { detectDefaultCountry, DATA_PAIS, CountryCode } from './utils/countryData';
 import { auth, subscribeToAuth, getStoredActiveUser } from './utils/firebaseAuth';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -157,22 +157,30 @@ export default function App() {
     };
   }, []);
 
-  // Inputs state - initialized with saved vehicle preset
+  // Inputs state - initialized with saved vehicle preset and active weighted fuel price
   const [inputs, setInputs] = useState<CalculatorInputs>(() => {
     const activeV = getActiveVehicleState();
+    const storedActiveFuel = localStorage.getItem('litrometrik_active_fuel') || 'Gas LPG';
+    const initialFuelType = (storedActiveFuel.includes('LPG') || storedActiveFuel.includes('GLP'))
+      ? 'lpg'
+      : (storedActiveFuel.includes('Diésel') || storedActiveFuel.includes('Diesel') || storedActiveFuel.includes('ON'))
+      ? 'diesel'
+      : 'gasolina';
+    const initialWeightedPrice = getWeightedFuelPrice(initialFuelType, initialCountry);
+
     return {
       country: initialCountry,
       vehicleType: activeV.vehicleType || 'sedan',
       customBaseConsumption: activeV.baseL100 || initialCountryData.Sedan.base,
       transmission: activeV.transmission || 'manual',
-      fuelType: 'gasolina',
+      fuelType: initialFuelType,
       routeType: 'mixto',
       distanceKm: 150,
       isRoundTrip: false,
       isACActive: false,
       coldStartLpg: true,
-      pricePerLiter: initialCountryData.preciosDefecto.gasolina,
-      referenceGasolinePrice: initialCountryData.preciosDefecto.gasolina,
+      pricePerLiter: initialWeightedPrice,
+      referenceGasolinePrice: getWeightedFuelPrice('gasolina', initialCountry),
       routeName: `Viaje Estándar (${initialCountryData.nombre})`,
     };
   });

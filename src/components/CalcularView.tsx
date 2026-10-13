@@ -23,7 +23,7 @@ import {
 import { createPortal } from 'react-dom';
 import { CalculatorInputs, SavedTrip, CountryCode, VehicleType, TransmissionType } from '../types';
 import { DATA_PAIS } from '../utils/countryData';
-import { calculateDetailedTrip } from '../utils/calculator';
+import { calculateDetailedTrip, getWeightedFuelPrice } from '../utils/calculator';
 import { saveCloudRecord } from '../utils/firestoreService';
 import {
   Sedan3D,
@@ -255,12 +255,43 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
     setIsEngineModalOpen(false);
   };
 
-  // Reset to official fuel price for current country & fuel type
+  // Synchronize with active weighted fuel price on initial load
+  useEffect(() => {
+    if (!inputs.pricePerLiter || inputs.pricePerLiter <= 0) {
+      const defP = getWeightedFuelPrice(inputs.fuelType, inputs.country);
+      onChange({ pricePerLiter: defP });
+      setPriceInputText(defP.toString());
+    }
+  }, [inputs.fuelType, inputs.country]);
+
+  // Synchronize with external refuels and weighted price updates in real-time
+  useEffect(() => {
+    const handleFuelUpdate = (e: any) => {
+      const detailFuel = e?.detail?.fuelType || e?.detail?.fuel || '';
+      const norm = (inputs.fuelType || '').toLowerCase();
+      const isMatch =
+        (detailFuel.includes('LPG') && (norm === 'lpg' || norm === 'glp')) ||
+        (detailFuel.includes('Diésel') && norm === 'diesel') ||
+        (detailFuel.includes('Gasolina') && norm === 'gasolina');
+
+      if (isMatch && typeof e?.detail?.price === 'number') {
+        onChange({ pricePerLiter: e.detail.price });
+        setPriceInputText(e.detail.price.toString());
+      }
+    };
+    window.addEventListener('litrometrik-fuel-updated', handleFuelUpdate);
+    window.addEventListener('litrometrik-prices-updated', handleFuelUpdate);
+    return () => {
+      window.removeEventListener('litrometrik-fuel-updated', handleFuelUpdate);
+      window.removeEventListener('litrometrik-prices-updated', handleFuelUpdate);
+    };
+  }, [inputs.fuelType, onChange]);
+
+  // Reset to weighted average fuel price for current country & fuel type
   const handleResetOfficialPrice = () => {
-    let official = countryData.preciosDefecto.gasolina;
-    if (inputs.fuelType === 'diesel') official = countryData.preciosDefecto.diesel;
-    else if (inputs.fuelType === 'lpg' || inputs.fuelType === 'glp') official = countryData.preciosDefecto.lpg;
-    onChange({ pricePerLiter: official });
+    const weighted = getWeightedFuelPrice(inputs.fuelType, inputs.country);
+    onChange({ pricePerLiter: weighted });
+    setPriceInputText(weighted.toString());
   };
 
   // Save Trip Action
@@ -349,16 +380,15 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                       localStorage.setItem('litrometrik_jurisdiction_country', c.code);
                     } catch (e) {}
 
-                    let defaultPrice = nextCountryData.preciosDefecto.gasolina;
-                    if (inputs.fuelType === 'diesel') defaultPrice = nextCountryData.preciosDefecto.diesel;
-                    else if (inputs.fuelType === 'lpg' || inputs.fuelType === 'glp') defaultPrice = nextCountryData.preciosDefecto.lpg;
+                    const defaultPrice = getWeightedFuelPrice(inputs.fuelType, c.code);
 
                     onChange({
                       country: c.code,
                       pricePerLiter: defaultPrice,
-                      referenceGasolinePrice: nextCountryData.preciosDefecto.gasolina,
+                      referenceGasolinePrice: getWeightedFuelPrice('gasolina', c.code),
                       routeName: `Viaje en ${nextCountryData.nombre}`,
                     });
+                    setPriceInputText(defaultPrice.toString());
                     setShowCountryMenu(false);
                     window.dispatchEvent(new CustomEvent('litrometrik-country-changed', { detail: { country: c.code } }));
                   }}
@@ -621,10 +651,12 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                   key={f.id}
                   type="button"
                   onClick={() => {
+                    const weighted = getWeightedFuelPrice(f.id, inputs.country);
                     onChange({
                       fuelType: f.id as any,
-                      pricePerLiter: f.price,
+                      pricePerLiter: weighted,
                     });
+                    setPriceInputText(weighted.toString());
                   }}
                   className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between active:scale-95 ${
                     isSelected
@@ -885,17 +917,12 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
               <div className="text-xs font-black text-white">Precio por Litro</div>
               <button
                 type="button"
-                onClick={() => {
-                  handleResetOfficialPrice();
-                  let official = countryData.preciosDefecto.gasolina;
-                  if (inputs.fuelType === 'diesel') official = countryData.preciosDefecto.diesel;
-                  else if (inputs.fuelType === 'lpg' || inputs.fuelType === 'glp') official = countryData.preciosDefecto.lpg;
-                  setPriceInputText(official.toString());
-                }}
+                onClick={handleResetOfficialPrice}
                 className="text-[10px] text-[#00D4FF] hover:underline flex items-center space-x-1 font-bold mt-0.5 cursor-pointer"
+                title="Cargar el precio promedio ponderado activo de tu tanque"
               >
                 <RefreshCw className="w-2.5 h-2.5" />
-                <span>Restablecer Precio Oficial</span>
+                <span>Restablecer Precio Ponderado ({getWeightedFuelPrice(inputs.fuelType, inputs.country).toFixed(2)} {currency}/L)</span>
               </button>
             </div>
 
