@@ -23,7 +23,7 @@ import {
 import { createPortal } from 'react-dom';
 import { CalculatorInputs, SavedTrip, CountryCode, VehicleType, TransmissionType } from '../types';
 import { DATA_PAIS } from '../utils/countryData';
-import { calculateDetailedTrip, getWeightedFuelPrice } from '../utils/calculator';
+import { calculateDetailedTrip, getWeightedFuelPrice, formatCurrency } from '../utils/calculator';
 import { saveCloudRecord } from '../utils/firestoreService';
 import {
   Sedan3D,
@@ -922,7 +922,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                 title="Cargar el precio promedio ponderado activo de tu tanque"
               >
                 <RefreshCw className="w-2.5 h-2.5" />
-                <span>Restablecer Precio Ponderado ({getWeightedFuelPrice(inputs.fuelType, inputs.country).toFixed(2)} {currency}/L)</span>
+                <span>Restablecer Precio Ponderado ({formatCurrency(getWeightedFuelPrice(inputs.fuelType, inputs.country), inputs.country, { isPerUnit: true })})</span>
               </button>
             </div>
 
@@ -981,11 +981,11 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                 <div className="flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full bg-[#FF6B00] shadow-[0_0_8px_#FF6B00]" />
                   <span className="text-white">{calc.comparativa.gasolina.label}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">({calc.comparativa.gasolina.pricePerLiter.toFixed(2)} {currency}/L)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">({formatCurrency(calc.comparativa.gasolina.pricePerLiter, inputs.country, { isPerUnit: true })})</span>
                 </div>
                 <div className="text-right">
                   <span className="text-[#FF6B00] font-black text-sm">
-                    {calc.comparativa.gasolina.totalCost.toFixed(2).replace('.', ',')} {currency}
+                    {formatCurrency(calc.comparativa.gasolina.totalCost, inputs.country)}
                   </span>
                   <span className="text-[10px] text-slate-400 ml-1.5">
                     ({calc.comparativa.gasolina.totalLiters.toFixed(1)} L)
@@ -1016,11 +1016,11 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                 <div className="flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full bg-[#00B4D8] shadow-[0_0_8px_#00B4D8]" />
                   <span className="text-white">{calc.comparativa.diesel.label}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">({calc.comparativa.diesel.pricePerLiter.toFixed(2)} {currency}/L)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">({formatCurrency(calc.comparativa.diesel.pricePerLiter, inputs.country, { isPerUnit: true })})</span>
                 </div>
                 <div className="text-right">
                   <span className="text-[#00B4D8] font-black text-sm">
-                    {calc.comparativa.diesel.totalCost.toFixed(2).replace('.', ',')} {currency}
+                    {formatCurrency(calc.comparativa.diesel.totalCost, inputs.country)}
                   </span>
                   <span className="text-[10px] text-slate-400 ml-1.5">
                     ({calc.comparativa.diesel.totalLiters.toFixed(1)} L)
@@ -1051,11 +1051,11 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                 <div className="flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981]" />
                   <span className="text-white">{calc.comparativa.glp.label}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">({calc.comparativa.glp.pricePerLiter.toFixed(2)} {currency}/L)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">({formatCurrency(calc.comparativa.glp.pricePerLiter, inputs.country, { isPerUnit: true })})</span>
                 </div>
                 <div className="text-right">
                   <span className="text-emerald-400 font-black text-sm">
-                    {calc.comparativa.glp.totalCost.toFixed(2).replace('.', ',')} {currency}
+                    {formatCurrency(calc.comparativa.glp.totalCost, inputs.country)}
                   </span>
                   <span className="text-[10px] text-slate-400 ml-1.5">
                     ({calc.comparativa.glp.totalLiters.toFixed(1)} L)
@@ -1092,7 +1092,7 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                   <span>
                     Si usaras LPG podrías ahorrar hasta{' '}
                     <span className="text-emerald-300 font-black text-sm">
-                      {calc.comparativa.savingGlpVsGas.toFixed(2).replace('.', ',')} {currency}
+                      {formatCurrency(calc.comparativa.savingGlpVsGas, inputs.country)}
                     </span>{' '}
                     ({calc.comparativa.percentSavedVsGas}% menos) en este trayecto.
                   </span>
@@ -1167,10 +1167,10 @@ export const CalcularView: React.FC<CalcularViewProps> = ({
                 Costo por Kilómetro
               </span>
               <div className="text-xl font-black text-[#FF4F00]">
-                {calc.costPerKm.toFixed(2).replace('.', ',')} <span className="text-xs text-slate-400">{currency}/km</span>
+                {formatCurrency(calc.costPerKm, inputs.country, { isPerUnit: true, unit: 'km' })}
               </div>
               <div className="text-[10px] text-slate-300 font-bold">
-                {calc.costPer10Km.toFixed(2).replace('.', ',')} {currency} cada 10 km
+                {formatCurrency(calc.costPer10Km, inputs.country)} cada 10 km
               </div>
             </div>
           </div>

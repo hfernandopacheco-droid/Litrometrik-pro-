@@ -328,3 +328,68 @@ export function calculateTrip(inputs: CalculatorInputs): CalculationResult {
     currency: d.currency,
   };
 }
+
+/**
+ * Global regional currency formatter:
+ * - Colombia (CO): Zero decimals, Math.round(), dot thousands separator, e.g. "$99.994 COP", "$120.000 COP", "$2.800 COP/L".
+ * - Poland (PL): 2 decimals with comma, e.g. "93,82 PLN", "3,15 PLN/L".
+ * - United States (US): 2 decimals with dot, e.g. "$3.50 USD", "$3.50 USD/gal".
+ */
+export function formatCurrency(
+  amount: number,
+  countryCode: CountryCode = 'PL',
+  options?: {
+    isPerUnit?: boolean;
+    unit?: string;
+  }
+): string {
+  const num = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+  const isPerUnit = !!options?.isPerUnit;
+  const defaultUnit = countryCode === 'US' ? 'gal' : 'L';
+  const unitName = options?.unit || defaultUnit;
+  const unitSuffix = isPerUnit ? `/${unitName}` : '';
+
+  if (countryCode === 'CO') {
+    const rounded = Math.round(num);
+    const formatted = rounded.toLocaleString('es-CO', {
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+    }).replace(/,/g, '.');
+    return `$${formatted} COP${unitSuffix}`;
+  }
+
+  if (countryCode === 'US') {
+    const formatted = num.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return `$${formatted} USD${unitSuffix}`;
+  }
+
+  // Poland (PL) default
+  const formatted = num.toFixed(2).replace('.', ',');
+  return `${formatted} PLN${unitSuffix}`;
+}
+
+/**
+ * Regional number-only formatter for monetary amounts without currency symbols
+ */
+export function formatCurrencyNumber(
+  amount: number,
+  countryCode: CountryCode = 'PL'
+): string {
+  const num = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+  if (countryCode === 'CO') {
+    return Math.round(num).toLocaleString('es-CO', {
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+    }).replace(/,/g, '.');
+  }
+  if (countryCode === 'US') {
+    return num.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+  return num.toFixed(2).replace('.', ',');
+}

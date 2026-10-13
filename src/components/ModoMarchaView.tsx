@@ -42,6 +42,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { CountryCode, DATA_PAIS } from '../utils/countryData';
+import { formatCurrency, formatCurrencyNumber } from '../utils/calculator';
 import { saveCloudRecord, saveCloudVehicleConfig } from '../utils/firestoreService';
 import { clearSupabaseTrips, signOutSupabase, insertSupabaseRefuel } from '../utils/supabaseClient';
 import { UserAccountModal } from './UserAccountModal';
@@ -2207,11 +2208,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
         <div className="relative select-none">
           {/* 2x2 Cluster de las 4 tarjetas envolviendo el velocímetro con interactividad y estética LitroMetrik Pro */}
           <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
-            {/* Campo 1: DISTANCIA (Top-Left) - Clickeable con información interactiva */}
+            {/* Campo 1: DISTANCIA (Top-Left) - Curva recortada interna inferior-derecha abrazando el velocímetro */}
             <div
               onClick={() => setSelectedClusterCardInfo('distancia')}
               title="Toca para ver explicación de Distancia"
-              className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-tl-3xl rounded-tr-xl rounded-bl-xl rounded-br-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-left items-start overflow-hidden group"
+              className="relative min-h-[140px] sm:min-h-[150px] p-3.5 sm:p-4 pb-4 sm:pb-5 pr-6 sm:pr-8 rounded-tl-3xl rounded-tr-xl rounded-bl-xl rounded-br-[56px] sm:rounded-br-[64px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-left items-start overflow-hidden group"
             >
               <div>
                 <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase block group-hover:text-sky-400 transition">
@@ -2234,11 +2235,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </p>
             </div>
 
-            {/* Campo 2: CONSUMO EN VIVO (Top-Right) - Clickeable con información interactiva */}
+            {/* Campo 2: CONSUMO EN VIVO (Top-Right) - Curva recortada interna inferior-izquierda abrazando el velocímetro */}
             <div
               onClick={() => setSelectedClusterCardInfo('consumo')}
               title="Toca para ver explicación de Consumo en Vivo"
-              className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-tr-3xl rounded-tl-xl rounded-br-xl rounded-bl-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-right items-end overflow-hidden group"
+              className="relative min-h-[140px] sm:min-h-[150px] p-3.5 sm:p-4 pb-4 sm:pb-5 pl-6 sm:pl-8 rounded-tr-3xl rounded-tl-xl rounded-br-xl rounded-bl-[56px] sm:rounded-bl-[64px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-right items-end overflow-hidden group"
             >
               <div>
                 <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase block group-hover:text-sky-400 transition">
@@ -2289,11 +2290,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Clickeable con información interactiva */}
+            {/* Campo 3: GASTO EN VIVO (Bottom-Left) - Curva recortada interna superior-derecha abrazando el velocímetro */}
             <div
               onClick={() => setSelectedClusterCardInfo('gasto')}
               title="Toca para ver explicación de Gasto en Vivo"
-              className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-bl-3xl rounded-tl-xl rounded-br-xl rounded-tr-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-left items-start overflow-hidden group"
+              className="relative min-h-[140px] sm:min-h-[150px] p-3.5 sm:p-4 pt-4 sm:pt-5 pr-6 sm:pr-8 rounded-bl-3xl rounded-tl-xl rounded-br-xl rounded-tr-[56px] sm:rounded-tr-[64px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-left items-start overflow-hidden group"
             >
               <div>
                 <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase group-hover:text-[#FF5722] transition block">
@@ -2303,7 +2304,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
 
               <div>
                 <div className="text-2xl sm:text-3xl lg:text-4xl font-black font-sans text-[#FF5722] tracking-tight">
-                  {liveCost.toFixed(2).replace('.', ',')} <span className="text-xs sm:text-sm font-bold text-slate-300">{currency}</span>
+                  {formatCurrency(liveCost, selectedCountry)}
                 </div>
 
                 <div className="text-[11px] text-slate-400 font-bold truncate mt-0.5">
@@ -2312,11 +2313,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               </div>
             </div>
 
-            {/* Campo 4: RITMO INSTANTÁNEO Y A/C (Bottom-Right) - Clickeable (A/C con e.stopPropagation) */}
+            {/* Campo 4: RITMO INSTANTÁNEO Y A/C (Bottom-Right) - Curva recortada interna superior-izquierda abrazando el velocímetro */}
             <div
               onClick={() => setSelectedClusterCardInfo('rendimiento')}
               title="Toca la tarjeta para ver explicación de Ritmo Instantáneo y A/C"
-              className={`relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-br-3xl rounded-tr-xl rounded-bl-xl rounded-tl-[52px] border transition-all duration-300 flex flex-col justify-between text-right items-end cursor-pointer select-none overflow-hidden group ${
+              className={`relative min-h-[140px] sm:min-h-[150px] p-3.5 sm:p-4 pt-4 sm:pt-5 pl-6 sm:pl-8 rounded-br-3xl rounded-tr-xl rounded-bl-xl rounded-tl-[56px] sm:rounded-tl-[64px] border transition-all duration-300 flex flex-col justify-between text-right items-end cursor-pointer select-none overflow-hidden group ${
                 isACActive
                   ? 'bg-gradient-to-br from-[#0B2138] via-[#0A1A2C] to-[#121620] border-cyan-400/80 shadow-[0_0_25px_rgba(0,212,255,0.2)] ring-1 ring-cyan-400/30'
                   : 'bg-[#131927]/95 border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98]'
@@ -2611,7 +2612,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   title="Toca para ver la explicación del Precio Ponderado del Tanque Activo"
                 >
                   <span>🏷️</span>
-                  <span>{activeWeightedPrice.toFixed(2).replace('.', ',')} {currency}/L</span>
+                  <span>{formatCurrency(activeWeightedPrice, selectedCountry, { isPerUnit: true })}</span>
                 </button>
               </div>
             </div>
@@ -2620,7 +2621,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
             <div className="grid grid-cols-3 gap-2">
               {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((fKey) => {
                 const isCurrent = activeFuel === fKey;
-                const shortLabel = fKey === 'Gas LPG' ? 'LPG' : fKey === 'Diésel ON' ? 'Diésel' : 'Gasolina';
+                const shortLabel = fKey === 'Gas LPG'
+                  ? (selectedCountry === 'CO' ? 'Gas GLP' : selectedCountry === 'US' ? 'LPG' : 'LPG')
+                  : fKey === 'Diésel ON'
+                  ? (selectedCountry === 'CO' ? 'Diésel ACPM' : selectedCountry === 'US' ? 'Diesel' : 'Diésel ON')
+                  : (selectedCountry === 'CO' ? 'Corriente' : selectedCountry === 'US' ? 'Gasoline' : 'Gasolina');
                 const icon = fKey === 'Gas LPG' ? '🔥' : fKey === 'Diésel ON' ? '🛢️' : '⛽';
                 const tankVal = isCurrent ? currentFuelBalance : (fuelTanks[fKey]?.balance || 0);
                 return (
@@ -2639,7 +2644,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                       <span className="text-xs font-black truncate">{shortLabel}</span>
                     </div>
                     <span className="text-[10px] font-mono text-amber-300 font-bold mt-0.5">
-                      {tankVal.toFixed(1).replace('.', ',')} {currency}
+                      {formatCurrency(tankVal, selectedCountry)}
                     </span>
                   </button>
                 );
@@ -2660,8 +2665,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   : 'text-[#FF4F00]'
               }`}
             >
-              {currentFuelBalance.toFixed(2).replace('.', ',')}{' '}
-              <span className="text-2xl font-bold uppercase">{currency}</span>
+              {formatCurrency(currentFuelBalance, selectedCountry)}
             </div>
 
             {isReserveActive && (
@@ -3399,7 +3403,11 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                     {(['Gas LPG', 'Gasolina Pb95', 'Diésel ON'] as FuelKey[]).map((f) => {
                       const isSelected = refuelFuelType === f;
                       const icon = f === 'Gas LPG' ? '🔥' : f === 'Diésel ON' ? '🛢️' : '⛽';
-                      const shortLabel = f === 'Gas LPG' ? 'LPG' : f === 'Gasolina Pb95' ? 'Gasolina' : 'Diésel';
+                      const shortLabel = f === 'Gas LPG'
+                        ? (selectedCountry === 'CO' ? 'Gas GLP' : selectedCountry === 'US' ? 'LPG' : 'LPG')
+                        : f === 'Diésel ON'
+                        ? (selectedCountry === 'CO' ? 'Diésel ACPM' : selectedCountry === 'US' ? 'Diesel' : 'Diésel')
+                        : (selectedCountry === 'CO' ? 'Corriente' : selectedCountry === 'US' ? 'Gasoline' : 'Gasolina');
                       const storedP = fuelPrices[f] || defaultPrices[selectedCountry]?.[f] || 6.09;
 
                       return (
@@ -3416,7 +3424,7 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                           <span className="text-base">{icon}</span>
                           <span className="text-[11px] font-black mt-0.5 truncate w-full">{shortLabel}</span>
                           <span className="text-[10px] font-mono text-[#FF4F00] font-bold mt-0.5">
-                            {storedP.toFixed(2)}
+                            {formatCurrency(storedP, selectedCountry, { isPerUnit: true })}
                           </span>
                         </button>
                       );
@@ -3516,12 +3524,12 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                           <span>Nuevo Precio Ponderado:</span>
                         </span>
                         <span className="text-sm font-mono font-black text-emerald-400">
-                          {pond.toFixed(2).replace('.', ',')} {currency}/L
+                          {formatCurrency(pond, selectedCountry, { isPerUnit: true })}
                         </span>
                       </div>
                       <div className="text-[10px] text-slate-400 flex items-center justify-between pt-0.5 border-t border-amber-500/20">
                         <span>Volumen total: {totVol.toFixed(2).replace('.', ',')} L</span>
-                        <span>Nuevo saldo: {totSal.toFixed(2).replace('.', ',')} {currency}</span>
+                        <span>Nuevo saldo: {formatCurrency(totSal, selectedCountry)}</span>
                       </div>
                     </div>
                   );
@@ -3915,13 +3923,13 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                   <div className="p-2.5 rounded-xl bg-[#0B0F19]/80 border border-slate-800">
                     <span className="text-[10px] text-slate-400 block font-medium">Saldo restante</span>
                     <span className="text-xs sm:text-sm font-black font-sans text-amber-400">
-                      {currentFuelBalance.toFixed(2).replace('.', ',')} {currency}
+                      {formatCurrency(currentFuelBalance, selectedCountry)}
                     </span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-[#0B0F19]/80 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.15)]">
                     <span className="text-[10px] text-slate-400 block font-medium">Precio ponderado</span>
                     <span className="text-xs sm:text-sm font-black font-mono text-emerald-400">
-                      {activeWeightedPrice.toFixed(2).replace('.', ',')} {currency}/L
+                      {formatCurrency(activeWeightedPrice, selectedCountry, { isPerUnit: true })}
                     </span>
                   </div>
                 </div>
@@ -3977,14 +3985,40 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
                         <span>💡</span>
                         <span>Ejemplo práctico:</span>
                       </div>
-                      <p className="leading-relaxed">
-                        Si te quedaban <strong className="text-white">10 L a 2,80 {currency} (28 {currency})</strong> y le agregas <strong className="text-white">20 L a 3,10 {currency} (62 {currency})</strong>:
-                      </p>
-                      <ul className="list-disc list-inside space-y-0.5 text-emerald-200/90 pl-1">
-                        <li>Tienes <strong>30 Litros</strong> en total.</li>
-                        <li>Pagaste <strong>90 {currency}</strong> en total.</li>
-                        <li>Tu precio ponderado pasa a ser exactamente <strong>3,00 {currency}/L</strong> (90 ÷ 30).</li>
-                      </ul>
+                      {selectedCountry === 'CO' ? (
+                        <>
+                          <p className="leading-relaxed">
+                            Si te quedaban <strong className="text-white">10 L a $2.500 COP ($25.000 COP)</strong> y le agregas <strong className="text-white">20 L a $3.100 COP ($62.000 COP)</strong>:
+                          </p>
+                          <ul className="list-disc list-inside space-y-0.5 text-emerald-200/90 pl-1">
+                            <li>Tienes <strong>30 Litros</strong> en total.</li>
+                            <li>Pagaste <strong>$87.000 COP</strong> en total.</li>
+                            <li>Tu precio ponderado pasa a ser exactamente <strong>$2.900 COP/L</strong> ($87.000 ÷ 30).</li>
+                          </ul>
+                        </>
+                      ) : selectedCountry === 'US' ? (
+                        <>
+                          <p className="leading-relaxed">
+                            Si te quedaban <strong className="text-white">5 gal a $3.20 USD ($16.00 USD)</strong> y le agregas <strong className="text-white">10 gal a $3.65 USD ($36.50 USD)</strong>:
+                          </p>
+                          <ul className="list-disc list-inside space-y-0.5 text-emerald-200/90 pl-1">
+                            <li>Tienes <strong>15 Galones</strong> en total.</li>
+                            <li>Pagaste <strong>$52.50 USD</strong> en total.</li>
+                            <li>Tu precio ponderado pasa a ser exactamente <strong>$3.50 USD/gal</strong> ($52.50 ÷ 15).</li>
+                          </ul>
+                        </>
+                      ) : (
+                        <>
+                          <p className="leading-relaxed">
+                            Si te quedaban <strong className="text-white">10 L a 2,80 PLN (28 PLN)</strong> y le agregas <strong className="text-white">20 L a 3,10 PLN (62 PLN)</strong>:
+                          </p>
+                          <ul className="list-disc list-inside space-y-0.5 text-emerald-200/90 pl-1">
+                            <li>Tienes <strong>30 Litros</strong> en total.</li>
+                            <li>Pagaste <strong>90 PLN</strong> en total.</li>
+                            <li>Tu precio ponderado pasa a ser exactamente <strong>3,00 PLN/L</strong> (90 ÷ 30).</li>
+                          </ul>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
