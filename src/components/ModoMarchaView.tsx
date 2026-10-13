@@ -2221,23 +2221,9 @@ export const ModoMarchaView: React.FC<ModoMarchaViewProps> = ({
               title="Toca para ver explicación de Gasto en Vivo"
               className="relative min-h-[136px] sm:min-h-[146px] p-3.5 sm:p-4 rounded-bl-3xl rounded-tl-xl rounded-br-xl rounded-tr-[52px] bg-[#131927]/95 border border-slate-800/90 shadow-[0_8px_25px_rgba(0,0,0,0.5)] hover:border-slate-700 active:scale-[0.98] transition-all cursor-pointer flex flex-col justify-between text-left items-start overflow-hidden group"
             >
-              <div className="flex items-center space-x-1.5">
-                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase group-hover:text-[#FF5722] transition">
+              <div>
+                <span className="text-[10px] sm:text-[11px] font-black tracking-widest text-slate-400 uppercase group-hover:text-[#FF5722] transition block">
                   GASTO EN VIVO
-                </span>
-                <span className="text-[11px] font-bold text-slate-300 flex items-center space-x-1">
-                  <span>
-                    {(() => {
-                      const fStr = (activeFuel || '') as string;
-                      if (fStr === 'Gas LPG' || fStr === 'Gas GLP' || fStr === 'LPG') {
-                        return selectedCountry === 'CO' ? '🔥 Gas GLP' : '🔥 LPG';
-                      }
-                      if (fStr === 'Diésel ON' || fStr === 'Diésel' || fStr === 'Diesel') {
-                        return '🛢️ Diésel';
-                      }
-                      return '⛽ Gasolina';
-                    })()}
-                  </span>
                 </span>
               </div>
 
